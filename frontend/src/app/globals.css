@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 font-sans;
+}
+
+/* Classes reaproveitadas pelos formulários e botões, para não repetir as mesmas utilidades.
+   Botões combinam a base com uma variante: className="btn btn-primary". */
+@layer components {
+  .label {
+    @apply mb-1 block text-sm font-medium text-zinc-700;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+
+  .btn-secondary {
+    @apply border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  /* Ações de IA (ex.: "Gerar capa com IA"). */
+  .btn-ai {
+    @apply bg-violet-600 text-white hover:bg-violet-700;
+  }
+
+  .card {
+    @apply rounded-lg border border-zinc-200 bg-white shadow-sm;
+  }
+}
