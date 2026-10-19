@@ -1,7 +1,20 @@
 // Descobre o tipo da imagem pelos primeiros bytes do arquivo ("assinatura" ou magic number),
 // sem confiar na extensão nem no Content-Type enviados pelo cliente.
 
-export type ImageType = { extension: 'jpg' | 'png' | 'webp'; mimeType: string };
+export type ImageType = { extension: 'jpg' | 'png' | 'webp' | 'svg'; mimeType: string };
+
+// SVG não tem assinatura binária e pode conter scripts, por isso NUNCA é aceito em upload:
+// detectImageType() só reconhece JPEG, PNG e WebP. O único SVG que o sistema guarda é a capa
+// gerada pela IA, já reconstruída por svg-sanitize.ts antes de ser salva.
+export const GENERATED_SVG: ImageType = { extension: 'svg', mimeType: 'image/svg+xml' };
+
+export function isSvgUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith('.svg');
+  } catch {
+    return false;
+  }
+}
 
 function startsWith(buffer: Buffer, bytes: number[], offset = 0): boolean {
   return bytes.every((byte, i) => buffer[offset + i] === byte);

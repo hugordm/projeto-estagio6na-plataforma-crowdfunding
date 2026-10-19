@@ -49,3 +49,29 @@ export async function listDonations(campaignId: number, { page, limit }: Paginat
     meta: buildMeta({ page, limit }, total),
   };
 }
+
+// Doações feitas pelo usuário, mais recentes primeiro, com o título da campanha.
+export async function listUserDonations(donorId: number, { page, limit }: Pagination) {
+  const where = { donorId };
+  const [total, donations] = await prisma.$transaction([
+    prisma.donation.count({ where }),
+    prisma.donation.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        message: true,
+        createdAt: true,
+        campaign: { select: { id: true, title: true, status: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  return {
+    data: donations.map(({ amount, ...rest }) => ({ ...rest, amount: formatMoney(amount) })),
+    meta: buildMeta({ page, limit }, total),
+  };
+}

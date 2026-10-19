@@ -3,32 +3,25 @@
  * - chat():          POST /chat/completions  (modelo OPENROUTER_CHAT_MODEL)
  * - embed():         POST /embeddings        (modelo OPENROUTER_EMBEDDING_MODEL)
  * - generateImage(): POST /images            (modelo OPENROUTER_IMAGE_MODEL)
- * Toda falha vira OpenRouterError com um "kind" que o resto do código usa para decidir o que fazer.
+ * Toda falha vira OpenRouterError (um AiError, ver ai-types.ts) com um "kind" que o resto do código
+ * usa para decidir o que fazer. O chat passa pela camada llm.ts, que pode usar a Anthropic no lugar.
  * A chave (OPENROUTER_API_KEY) nunca é registrada em log.
  */
 
 import './network';
+import { AiError, type AiErrorKind, type ChatMessage, type ChatOptions } from './ai-types';
+
+// Reexportado para quem já importava daqui.
+export type { ChatMessage } from './ai-types';
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
 const RETRYABLE_STATUS = [429, 502, 503];
 const RETRY_DELAY_MS = 800;
 
-export type OpenRouterErrorKind =
-  | 'not_configured' // falta chave ou modelo no .env
-  | 'timeout'
-  | 'rate_limited' // 429 do OpenRouter/provedor
-  | 'no_credits' // 402
-  | 'unavailable' // modelo/provedor fora do ar (502, 503) ou falha de rede
-  | 'rejected' // 400, 401, 403 (ex.: moderação)
-  | 'bad_response'; // resposta sem o conteúdo esperado
-
-export class OpenRouterError extends Error {
-  constructor(
-    public readonly kind: OpenRouterErrorKind,
-    message: string,
-    public readonly status?: number,
-  ) {
-    super(message);
+// Erro do OpenRouter: mesmo formato (kind, message, status) do AiError comum.
+export class OpenRouterError extends AiError {
+  constructor(kind: AiErrorKind, message: string, status?: number) {
+    super(kind, message, status);
     this.name = 'OpenRouterError';
   }
 }
@@ -51,7 +44,8 @@ export function isAiConfigured(kind: ModelKind): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY && process.env[MODEL_ENV[kind]]);
 }
 
-function errorKindFromStatus(status: number): OpenRouterErrorKind {
+function errorKindFromStatus(status: number): AiErrorKind {
+  if (status === 401) return 'invalid_key';
   if (status === 402) return 'no_credits';
   if (status === 408) return 'timeout';
   if (status === 429) return 'rate_limited';
@@ -114,15 +108,13 @@ async function post<T>(path: string, body: unknown, timeoutMs: number, attempt =
 
 // ---------- Chat ----------
 
-export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-
 type ChatResponse = { choices?: { message?: { content?: string | null } }[] };
 
-export async function chat(messages: ChatMessage[], options: { maxTokens?: number; temperature?: number } = {}) {
+export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<string> {
   const data = await post<ChatResponse>(
     '/chat/completions',
     {
-      model: getModel('chat'),
+      model: options.model ?? getModel('chat'),
       messages,
       max_tokens: options.maxTokens ?? 500,
       temperature: options.temperature ?? 0.3,

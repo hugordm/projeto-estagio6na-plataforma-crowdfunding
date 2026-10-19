@@ -15,10 +15,11 @@ export async function register(data: { name: string; email: string; password: st
   const passwordHash = await bcrypt.hash(data.password, BCRYPT_COST);
   const user = await prisma.user.create({
     data: { name: data.name, email: data.email, passwordHash },
-    select: publicUserSelect,
+    select: { ...publicUserSelect, tokenVersion: true },
   });
 
-  return { user, token: signToken(user.id) };
+  const { tokenVersion, ...publicUser } = user;
+  return { user: publicUser, token: signToken(user.id, tokenVersion) };
 }
 
 export async function login(data: { email: string; password: string }) {
@@ -27,6 +28,6 @@ export async function login(data: { email: string; password: string }) {
   const valid = user !== null && (await bcrypt.compare(data.password, user.passwordHash));
   if (!user || !valid) throw new HttpError(401, 'E-mail ou senha inválidos');
 
-  const { passwordHash: _omit, ...publicUser } = user;
-  return { user: publicUser, token: signToken(user.id) };
+  const { passwordHash: _omit, tokenVersion, ...publicUser } = user;
+  return { user: publicUser, token: signToken(user.id, tokenVersion) };
 }

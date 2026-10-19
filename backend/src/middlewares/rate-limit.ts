@@ -90,3 +90,13 @@ export const aiImageLimiter = rateLimit({
   keyGenerator: userOrIp,
   message: limitMessage('Aguarde alguns minutos antes de gerar outra capa.'),
 });
+
+// IA no formulário ("Melhorar descrição" e "Sugerir categoria"): 10 pedidos a cada 10 minutos por usuário.
+export const aiTextLimiter = rateLimit({
+  windowMs: 10 * MINUTE,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: userOrIp,
+  message: limitMessage('Muitos pedidos à IA em pouco tempo. Aguarde alguns minutos e tente novamente.'),
+});

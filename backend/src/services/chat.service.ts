@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { HttpError } from '../lib/http-error';
-import { chat, OpenRouterError, type ChatMessage } from '../lib/openrouter';
+import { AiError, chat, type ChatMessage } from '../lib/llm';
 import { toPlainText } from '../lib/plain-text';
 import { findRelatedCampaigns } from './search.service';
 
@@ -17,7 +17,7 @@ Cumprimente apenas na primeira resposta da conversa; nas seguintes, vá direto a
 FORMATO OBRIGATÓRIO: texto puro. Não use markdown: nada de asteriscos, cerquilhas, crases, sublinhados para ênfase, listas com marcadores (hífen, asterisco ou bolinha), tabelas ou links no formato [texto](url). Se precisar enumerar passos, use frases corridas ou "1)", "2)", "3)" no começo de linhas separadas.
 
 COMO A PLATAFORMA FUNCIONA (use apenas estas informações):
-- Conta: clique em "Criar conta" no topo da página (nome, e-mail e senha com pelo menos 6 caracteres). Para entrar, use "Entrar".
+- Conta: clique em "Criar conta" no topo da página (nome, e-mail e senha de 8 a 72 caracteres). Para entrar, use "Entrar".
 - Recuperar senha: em "Entrar", clique em "Esqueci minha senha" e informe o e-mail; chega um link válido por 30 minutos para criar uma nova senha.
 - Criar campanha: com login feito, clique em "Nova campanha" e preencha título, descrição, meta em reais, prazo e categoria. A imagem de capa é opcional: dá para enviar um arquivo (JPEG, PNG ou WebP até 5 MB), colar o endereço de uma imagem ou clicar em "Gerar capa com IA" (até 5 capas por dia).
 - Editar ou encerrar: só o dono da campanha, pelo botão "Editar campanha" na página dela. Campanha que já recebeu doações não pode ser excluída, apenas encerrada.
@@ -67,7 +67,7 @@ export async function answer(history: ChatMessage[]): Promise<string> {
     const reply = await chat(messages, { maxTokens: 400, temperature: 0.3 });
     return toPlainText(reply);
   } catch (error) {
-    if (error instanceof OpenRouterError) {
+    if (error instanceof AiError) {
       console.error(`[chat] [${error.kind}] ${error.message}`);
       throw new HttpError(503, 'O assistente está indisponível no momento. Tente novamente em instantes.');
     }

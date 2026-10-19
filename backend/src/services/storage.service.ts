@@ -41,6 +41,11 @@ class DiskStorage implements Storage {
 
 export const storage: Storage = new DiskStorage();
 
+// true se a URL aponta para um arquivo salvo por este servidor (ex.: capa SVG gerada pela IA).
+export function isOwnUploadUrl(url: string): boolean {
+  return url.startsWith(`${backendUrl()}${UPLOADS_ROUTE}/`);
+}
+
 // Salva e já devolve a URL pública (usado pelo upload e pela capa gerada por IA).
 export async function saveImage(content: Buffer, extension: string): Promise<string> {
   const key = await storage.save(content, extension);

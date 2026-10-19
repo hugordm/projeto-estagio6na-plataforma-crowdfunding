@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getUserId } from '../middlewares/auth';
 import { moneySchema } from '../lib/money';
 import { idParamSchema, paginationSchema } from '../lib/pagination';
+import { isSvgUrl } from '../lib/image-type';
+import { isOwnUploadUrl } from '../services/storage.service';
 import * as campaignService from '../services/campaign.service';
 import * as searchService from '../services/search.service';
 
@@ -22,7 +24,11 @@ const campaignSchema = z.object({
   deadline: deadlineSchema,
   categoryId: z.coerce.number({ error: 'Categoria é obrigatória' }).int('Categoria inválida').positive('Categoria inválida'),
   // Aceita URL externa ou a devolvida por POST /uploads/campaign-image (só http/https).
-  imageUrl: z.url({ protocol: /^https?$/, error: 'URL da imagem inválida' }).optional(),
+  // SVG só quando é um arquivo deste servidor (capa gerada e sanitizada pela IA).
+  imageUrl: z
+    .url({ protocol: /^https?$/, error: 'URL da imagem inválida' })
+    .refine((url) => !isSvgUrl(url) || isOwnUploadUrl(url), 'Imagens SVG só são aceitas quando geradas pela plataforma')
+    .optional(),
 });
 
 const updateCampaignSchema = campaignSchema

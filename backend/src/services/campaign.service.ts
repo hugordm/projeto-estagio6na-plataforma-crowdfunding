@@ -115,6 +115,27 @@ export async function getCampaignsByIds(ids: number[]) {
   });
 }
 
+// Campanhas criadas pelo usuário (todas as situações), mais recentes primeiro, com daysLeft.
+export async function listOwnCampaigns(ownerId: number, { page, limit }: Pagination) {
+  const where = { ownerId };
+  const [total, campaigns] = await prisma.$transaction([
+    prisma.campaign.count({ where }),
+    prisma.campaign.findMany({
+      where,
+      include: campaignInclude,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  const stats = await getDonationStats(campaigns.map((c) => c.id));
+  return {
+    data: campaigns.map((c) => ({ ...serializeCampaign(c, stats.get(c.id)), daysLeft: daysLeft(c.deadline) })),
+    meta: buildMeta({ page, limit }, total),
+  };
+}
+
 export async function getCampaign(id: number) {
   const campaign = await prisma.campaign.findUnique({ where: { id }, include: campaignInclude });
   if (!campaign) throw new HttpError(404, 'Campanha não encontrada');

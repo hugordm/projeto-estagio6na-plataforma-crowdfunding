@@ -70,6 +70,10 @@ export async function resetPassword(token: string, password: string): Promise<vo
     });
     if (count === 0) throw new HttpError(400, INVALID_TOKEN_MESSAGE);
 
-    await tx.user.update({ where: { id: record.userId }, data: { passwordHash } });
+    // Nova versão de token: todas as sessões abertas com a senha antiga deixam de valer.
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    });
   });
 }

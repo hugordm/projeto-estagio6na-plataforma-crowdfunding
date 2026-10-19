@@ -10,10 +10,15 @@ const emailSchema = z
   .pipe(z.email('E-mail inválido'));
 
 // Mesmas regras no cadastro e na redefinição de senha (bcrypt usa no máximo 72 bytes).
+// O frontend repete a regra e a mensagem em src/lib/password-rules.ts. O login não tem mínimo.
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 72;
+const PASSWORD_MESSAGE = `A senha deve ter de ${PASSWORD_MIN} a ${PASSWORD_MAX} caracteres.`;
+
 const passwordSchema = z
   .string({ error: 'Senha é obrigatória' })
-  .min(6, 'Senha deve ter pelo menos 6 caracteres')
-  .max(72, 'Senha deve ter no máximo 72 caracteres');
+  .min(PASSWORD_MIN, PASSWORD_MESSAGE)
+  .max(PASSWORD_MAX, PASSWORD_MESSAGE);
 
 const registerSchema = z.object({
   name: z.string({ error: 'Nome é obrigatório' }).trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres'),
