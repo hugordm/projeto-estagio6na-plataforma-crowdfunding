@@ -1,7 +1,8 @@
 import { HttpError } from '../lib/http-error';
 import { AiError } from '../lib/ai-types';
 import { detectImageType, GENERATED_SVG } from '../lib/image-type';
-import { generateImage, OpenRouterError } from '../lib/openrouter';
+import { isAnthropicConfigured } from '../lib/anthropic';
+import { generateImage, isAiConfigured, OpenRouterError } from '../lib/openrouter';
 import { completeImageGeneration, releaseImageGeneration, reserveImageGeneration } from './ai-usage.service';
 import { saveImage } from './storage.service';
 import { generateSvgCover } from './svg-cover.service';
@@ -14,6 +15,12 @@ export type CoverProvider = 'openrouter' | 'anthropic-svg';
 
 export function coverProvider(): CoverProvider {
   return process.env.COVER_PROVIDER === 'anthropic-svg' ? 'anthropic-svg' : 'openrouter';
+}
+
+// Capa por IA disponível? anthropic-svg: chave da Anthropic (o modelo tem padrão, ANTHROPIC_COVER_MODEL
+// ou claude-sonnet-5-5); openrouter: chave do OpenRouter e OPENROUTER_IMAGE_MODEL.
+export function isCoverConfigured(): boolean {
+  return coverProvider() === 'anthropic-svg' ? isAnthropicConfigured() : isAiConfigured('image');
 }
 
 const MAX_DESCRIPTION_CHARS = 600;

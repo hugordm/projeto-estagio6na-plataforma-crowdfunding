@@ -7,13 +7,13 @@ import * as aiCategoryService from '../services/ai-category.service';
 const titleSchema = z.string({ error: 'Título é obrigatório' }).trim().min(3, 'Título deve ter pelo menos 3 caracteres').max(120, 'Título deve ter no máximo 120 caracteres');
 const descriptionSchema = z.string({ error: 'Descrição é obrigatória' }).trim().min(10, 'Descrição deve ter pelo menos 10 caracteres').max(5000, 'Descrição deve ter no máximo 5000 caracteres');
 
-const descriptionInputSchema = z.object({
+export const descriptionInputSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   category: z.string('Categoria deve ser um texto').trim().max(60, 'Categoria inválida').optional(),
 });
 
-const categoryInputSchema = z.object({ title: titleSchema, description: descriptionSchema });
+export const categoryInputSchema = z.object({ title: titleSchema, description: descriptionSchema });
 
 // POST /campaigns/ai-description { title, description, category? } -> { description }
 export async function improveDescription(req: Request, res: Response) {

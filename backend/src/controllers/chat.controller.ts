@@ -14,7 +14,7 @@ const messageSchema = z.object({
     .max(MAX_MESSAGE_CHARS, `Cada mensagem deve ter no máximo ${MAX_MESSAGE_CHARS} caracteres`),
 });
 
-const chatSchema = z.object({
+export const chatSchema = z.object({
   messages: z
     .array(messageSchema, { error: 'Envie o histórico em "messages"' })
     .min(1, 'Envie ao menos uma mensagem')

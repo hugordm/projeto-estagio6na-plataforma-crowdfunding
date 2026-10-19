@@ -8,7 +8,7 @@ import { isOwnUploadUrl } from '../services/storage.service';
 import * as campaignService from '../services/campaign.service';
 import * as searchService from '../services/search.service';
 
-const listQuerySchema = paginationSchema.extend({
+export const listQuerySchema = paginationSchema.extend({
   category: z.string().trim().optional(),
   q: z.string().trim().optional(),
 });
@@ -17,7 +17,7 @@ const deadlineSchema = z.coerce
   .date({ error: 'Prazo (deadline) deve ser uma data válida' })
   .refine((date) => date > new Date(), 'Prazo (deadline) deve ser uma data futura');
 
-const campaignSchema = z.object({
+export const campaignSchema = z.object({
   title: z.string({ error: 'Título é obrigatório' }).trim().min(3, 'Título deve ter pelo menos 3 caracteres').max(120, 'Título deve ter no máximo 120 caracteres'),
   description: z.string({ error: 'Descrição é obrigatória' }).trim().min(10, 'Descrição deve ter pelo menos 10 caracteres').max(5000, 'Descrição deve ter no máximo 5000 caracteres'),
   goalAmount: moneySchema('Meta (goalAmount)'),
@@ -31,7 +31,7 @@ const campaignSchema = z.object({
     .optional(),
 });
 
-const updateCampaignSchema = campaignSchema
+export const updateCampaignSchema = campaignSchema
   .extend({
     status: z.enum(['ACTIVE', 'FINISHED'], { error: 'Status deve ser ACTIVE ou FINISHED' }),
     // Na edição, null remove a imagem.
@@ -45,7 +45,7 @@ export async function list(req: Request, res: Response) {
   res.json(await campaignService.listCampaigns(filters));
 }
 
-const searchQuerySchema = paginationSchema.extend({
+export const searchQuerySchema = paginationSchema.extend({
   q: z.string({ error: 'Informe o texto da busca (q)' }).trim().min(2, 'A busca deve ter pelo menos 2 caracteres').max(200, 'A busca deve ter no máximo 200 caracteres'),
   category: z.string().trim().optional(),
 });

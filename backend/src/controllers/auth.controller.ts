@@ -20,20 +20,20 @@ const passwordSchema = z
   .min(PASSWORD_MIN, PASSWORD_MESSAGE)
   .max(PASSWORD_MAX, PASSWORD_MESSAGE);
 
-const registerSchema = z.object({
+export const registerSchema = z.object({
   name: z.string({ error: 'Nome é obrigatório' }).trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100, 'Nome deve ter no máximo 100 caracteres'),
   email: emailSchema,
   password: passwordSchema,
 });
 
-const loginSchema = z.object({
+export const loginSchema = z.object({
   email: emailSchema,
   password: z.string({ error: 'Senha é obrigatória' }).min(1, 'Senha é obrigatória'),
 });
 
-const forgotPasswordSchema = z.object({ email: emailSchema });
+export const forgotPasswordSchema = z.object({ email: emailSchema });
 
-const resetPasswordSchema = z.object({
+export const resetPasswordSchema = z.object({
   token: z.string({ error: 'Token é obrigatório' }).trim().min(1, 'Token é obrigatório').max(200, 'Token inválido'),
   password: passwordSchema,
 });

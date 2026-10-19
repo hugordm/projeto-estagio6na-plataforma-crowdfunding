@@ -16,6 +16,8 @@ export function chatProvider(): ChatProvider {
   return process.env.CHAT_PROVIDER === 'anthropic' ? 'anthropic' : 'openrouter';
 }
 
+// Texto por IA disponível? anthropic: chave (o modelo tem padrão, claude-haiku-5-5);
+// openrouter: chave e OPENROUTER_CHAT_MODEL.
 export function isChatConfigured(): boolean {
   return chatProvider() === 'anthropic' ? anthropic.isAnthropicConfigured() : openrouter.isAiConfigured('chat');
 }

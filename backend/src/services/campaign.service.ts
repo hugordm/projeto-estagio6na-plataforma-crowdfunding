@@ -49,7 +49,8 @@ function serializeCampaign(campaign: CampaignWithRelations, stats: DonationStats
   };
 }
 
-function daysLeft(deadline: Date): number {
+// Dias (arredondados para cima) até o prazo, nunca negativo. Também usado no contexto do chatbot.
+export function daysLeft(deadline: Date): number {
   return Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / DAY_MS));
 }
 

@@ -391,3 +391,20 @@ GET {{baseUrl}}/me/campaigns
 # curl -s $BASE/me/campaigns -H "Authorization: Bearer $TOKEN_ANTIGO"
 GET {{baseUrl}}/me/campaigns
 Authorization: Bearer {{tokenAna}}
+
+# =====================================================================
+# Configuração pública
+# =====================================================================
+
+### 27. Recursos de IA ligados (200 -> { "semanticSearch": false, "aiCover": true, "aiChat": true, "aiWriting": true })
+# Só booleanos: nenhum valor do .env, nome de variável ou modelo. O frontend esconde o que estiver false.
+# curl -s $BASE/config/features
+GET {{baseUrl}}/config/features
+
+# =====================================================================
+# Documentação da API (desligue com DOCS_ENABLED=false)
+# =====================================================================
+
+### 28. Especificação OpenAPI 3.0 (200; a interface interativa fica em http://localhost:3001/docs)
+# curl -s $BASE/docs.json
+GET {{baseUrl}}/docs.json

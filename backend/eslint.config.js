@@ -6,7 +6,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['generated/**', 'node_modules/**', 'uploads/**'] },
+  { ignores: ['generated/**', 'node_modules/**', 'uploads/**', 'dist/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

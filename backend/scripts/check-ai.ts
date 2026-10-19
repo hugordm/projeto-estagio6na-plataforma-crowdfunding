@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { generateSvgCover } from '../src/services/svg-cover.service';
 import { coverProvider } from '../src/services/ai-cover.service';
+import { getFeatures } from '../src/services/features.service';
 
 const vars = [
   'CHAT_PROVIDER',
@@ -27,6 +28,7 @@ const vars = [
 ];
 for (const name of vars) console.log(`${name}: ${process.env[name] ? 'definida' : 'ausente'}`);
 console.log(`\nProvedor de chat: ${chatProvider()} | provedor de capa: ${coverProvider()}`);
+console.log('Recursos ligados (GET /config/features):', JSON.stringify(getFeatures()));
 
 async function step(label: string, run: () => Promise<string>) {
   const start = Date.now();

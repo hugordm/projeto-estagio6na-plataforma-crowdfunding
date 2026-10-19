@@ -1,0 +1,17 @@
+# Fica fora do contexto do build (e portanto da imagem).
+node_modules
+dist
+generated
+uploads
+.env*
+!.env.example
+.git
+.gitignore
+*.tmp.ts
+docs
+.claude
+.agents
+.windsurf
+skills-lock.json
+Dockerfile
+.dockerignore

@@ -2,6 +2,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../lib/prisma';
 import { embed, isAiConfigured, OpenRouterError } from '../lib/openrouter';
 import { buildMeta, type Pagination } from '../lib/pagination';
+import { searchTerms } from '../lib/search-terms';
 import { getCampaignsByIds, listCampaigns } from './campaign.service';
 import { toVectorLiteral } from './embedding.service';
 
@@ -12,6 +13,11 @@ import { toVectorLiteral } from './embedding.service';
 export const MIN_SIMILARITY = 0.45;
 
 export type SearchFilters = Pagination & { q: string; category?: string };
+
+// Busca semântica disponível? Precisa da chave do OpenRouter e do modelo de embeddings.
+export function isSemanticSearchConfigured(): boolean {
+  return isAiConfigured('embedding');
+}
 
 // Busca por significado: transforma a consulta em vetor e ordena as campanhas pela
 // distância de cosseno (operador <=> do pgvector; similaridade = 1 - distância).
@@ -56,7 +62,7 @@ async function semanticSearch({ q, category, page, limit }: SearchFilters) {
 // usa a busca textual da listagem e avisa no campo "notice".
 export async function searchCampaigns(filters: SearchFilters) {
   try {
-    if (!isAiConfigured('embedding')) {
+    if (!isSemanticSearchConfigured()) {
       throw new OpenRouterError('not_configured', 'Modelo de embeddings não configurado');
     }
     return { ...(await semanticSearch(filters)), mode: 'semantic' as const };
@@ -72,12 +78,58 @@ export async function searchCampaigns(filters: SearchFilters) {
   }
 }
 
+// Acentos -> letras sem acento, para comparar no banco com o texto normalizado da pergunta.
+// translate() + lower() são nativos do PostgreSQL: não precisam da extensão unaccent (que exigiria
+// uma migration nova) e o resultado é o mesmo da normalização feita em src/lib/search-terms.ts.
+const ACCENTED = 'ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑáàâãäéèêëíìîïóòôõöúùûüçñ';
+const UNACCENTED = 'AAAAAEEEEIIIIOOOOOUUUUCNaaaaaeeeeiiiiooooouuuucn';
+
+// Busca textual de campanhas relacionadas a uma pergunta (alternativa à semântica):
+// - termos relevantes da pergunta (sem acentos, pontuação e palavras vazias);
+// - cada termo vale 1 ponto se aparecer no título, na descrição ou no nome da categoria
+//   (a categoria entra para perguntas como "tem campanha de educação?");
+// - a campanha entra se bater a maioria dos termos, ou metade deles incluindo o mais específico
+//   (o mais longo, ex.: "biblioteca" pesa mais que "bairro");
+// - só campanhas ativas, ordenadas pelos pontos (e depois pelas mais recentes).
+// Devolve no mesmo formato da busca semântica (getCampaignsByIds, o mesmo da listagem).
+export async function findRelatedCampaignsByText(question: string, limit = 3) {
+  const terms = searchTerms(question);
+  if (terms.length === 0) return [];
+
+  const specific = [...terms].sort((a, b) => b.length - a.length)[0];
+  const majority = Math.floor(terms.length / 2) + 1;
+  const half = Math.ceil(terms.length / 2);
+
+  const text = Prisma.sql`lower(translate(c."title" || ' ' || c."description" || ' ' || cat."name", ${ACCENTED}, ${UNACCENTED}))`;
+  const hit = (term: string) => Prisma.sql`(CASE WHEN ${text} LIKE ${`%${term}%`} THEN 1 ELSE 0 END)`;
+
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT "id" FROM (
+      SELECT c."id", c."createdAt", (${Prisma.join(terms.map(hit), ' + ')}) AS score, ${hit(specific)} AS specific
+      FROM "Campaign" c JOIN "Category" cat ON cat."id" = c."categoryId"
+      WHERE c."status" = 'ACTIVE'
+    ) ranked
+    WHERE score >= ${majority} OR (score >= ${half} AND specific = 1)
+    ORDER BY score DESC, "createdAt" DESC
+    LIMIT ${limit}`;
+
+  return getCampaignsByIds(rows.map((row) => row.id));
+}
+
 // Até `limit` campanhas relacionadas ao texto, usadas como contexto do chatbot.
-// O contexto é opcional: qualquer falha (IA ou banco) só gera log e devolve lista vazia.
+// Usa a busca semântica quando os embeddings estão configurados; se não estiverem, ou se a IA
+// falhar, cai para a busca textual. O contexto é opcional: qualquer outra falha só gera log.
 export async function findRelatedCampaigns(text: string, limit = 3) {
-  if (!isAiConfigured('embedding')) return [];
   try {
-    return (await semanticSearch({ q: text, page: 1, limit })).data;
+    if (isSemanticSearchConfigured()) {
+      try {
+        return (await semanticSearch({ q: text, page: 1, limit })).data;
+      } catch (error) {
+        if (!(error instanceof OpenRouterError)) throw error;
+        console.warn(`[chat] Busca semântica indisponível, usando busca textual: [${error.kind}] ${error.message}`);
+      }
+    }
+    return await findRelatedCampaignsByText(text, limit);
   } catch (error) {
     console.warn('[chat] Sem campanhas relacionadas:', error instanceof Error ? error.message : error);
     return [];
