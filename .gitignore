@@ -1,0 +1,10 @@
+# Regras gerais do repositório (backend/ e frontend/ têm seus próprios .gitignore).
+node_modules/
+.env
+.env.local
+
+# Pastas e arquivos de ferramentas de IA/editor
+.claude/
+.agents/
+.windsurf/
+skills-lock.json
