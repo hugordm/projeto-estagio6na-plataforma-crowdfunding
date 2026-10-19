@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -13,8 +11,97 @@ datasource db {
 }
 
 model User {
+  id           Int                  @id @default(autoincrement())
+  name         String
+  email        String               @unique
+  passwordHash String
+  createdAt    DateTime             @default(now())
+  campaigns    Campaign[]
+  donations    Donation[]
+  resetTokens  PasswordResetToken[]
+  aiImages     AiImageGeneration[]
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  campaigns Campaign[]
+}
+
+enum CampaignStatus {
+  ACTIVE
+  FINISHED
+}
+
+model Campaign {
+  id                 Int            @id @default(autoincrement())
+  title              String
+  description        String
+  goalAmount         Decimal        @db.Decimal(12, 2)
+  imageUrl           String?
+  // true quando imageUrl é uma capa gerada pela IA deste sistema (definido pelo backend).
+  imageGeneratedByAi Boolean        @default(false)
+  deadline           DateTime
+  status             CampaignStatus @default(ACTIVE)
+  ownerId            Int
+  owner              User           @relation(fields: [ownerId], references: [id])
+  categoryId         Int
+  category           Category       @relation(fields: [categoryId], references: [id])
+  donations          Donation[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  // Embedding (pgvector) de "título + descrição + categoria", usado na busca semântica.
+  // 1024 = dimensão do modelo baai/bge-m3. O Prisma Client não lê este tipo: usamos SQL bruto.
+  // O índice HNSW (vector_cosine_ops) é criado na migration, pois o Prisma não tem esse tipo de índice.
+  // ATENÇÃO: o Prisma não "enxerga" esse índice e tenta apagá-lo nas próximas migrations. Crie migrations
+  // com --create-only e remova a linha DROP INDEX "Campaign_embedding_hnsw_idx" antes de aplicar.
+  embedding Unsupported("vector(1024)")?
+
+  @@index([ownerId])
+  @@index([categoryId])
+}
+
+// O valor arrecadado não é coluna: é a soma (aggregate) das doações da campanha.
+model Donation {
+  id         Int      @id @default(autoincrement())
+  amount     Decimal  @db.Decimal(12, 2)
+  message    String?
+  donorId    Int
+  donor      User     @relation(fields: [donorId], references: [id])
+  campaignId Int
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([donorId])
+}
+
+// Token de recuperação de senha. Só o hash (SHA-256) fica no banco: quem ler a tabela
+// não consegue usar os tokens. Uso único (usedAt) e validade curta (expiresAt).
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Registro de cada geração de imagem por IA: usado para o limite diário por usuário.
+// Uma tabela (em vez de contador em memória) sobrevive a reinícios do servidor e serve de histórico.
+model AiImageGeneration {
   id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // URL pública da imagem gerada (preenchida após o sucesso). Serve para o backend
+  // reconhecer, ao salvar uma campanha, que a capa escolhida foi gerada por IA.
+  url       String?
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([url])
 }

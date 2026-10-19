@@ -4,6 +4,10 @@ node_modules
 
 /generated/
 
+# Imagens enviadas pelos usuários (a pasta fica no git só com o .gitkeep)
+/uploads/*
+!/uploads/.gitkeep
+
 .agents/
 .claude/
 .windsurf/

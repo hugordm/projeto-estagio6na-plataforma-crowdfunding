@@ -9,5 +9,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["src", "generated", "*.ts"]
+  "include": ["src", "generated", "prisma", "scripts", "*.ts"]
 }

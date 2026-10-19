@@ -6,6 +6,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // No Prisma 7 o seed é configurado aqui (não mais no package.json) e só roda com "prisma db seed".
+    seed: "tsx prisma/seed.ts",
   },
   datasource: {
     url: env("DATABASE_URL"),
