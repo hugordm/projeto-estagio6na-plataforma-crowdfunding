@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { errorMessage } from "@/lib/api";
+import { emailFromParam } from "@/lib/email-param";
 import { ErrorMessage } from "@/components/StatusMessage";
+import { BackButton } from "@/components/BackButton";
+import { PasswordInput } from "@/components/PasswordInput";
 
 // O Next exige <Suspense> em volta de componentes que usam useSearchParams.
 export default function LoginPage() {
@@ -21,7 +24,8 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [email, setEmail] = useState("");
+  // Vindo do cadastro (?email=...), o e-mail já chega preenchido (só se tiver formato válido).
+  const [email, setEmail] = useState(() => emailFromParam(searchParams.get("email")));
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,6 +52,7 @@ function LoginForm() {
 
   return (
     <div className="mx-auto max-w-sm">
+      <BackButton fallbackHref="/" />
       <h1 className="mb-6 text-2xl font-bold">Entrar</h1>
       {passwordWasReset && (
         <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -73,15 +78,7 @@ function LoginForm() {
           <label htmlFor="password" className="label">
             Senha
           </label>
-          <input
-            id="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <PasswordInput id="password" autoComplete="current-password" value={password} onChange={setPassword} />
         </div>
 
         <div className="text-right">

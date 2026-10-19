@@ -30,6 +30,9 @@ export type CampaignDetail = Campaign & {
   daysLeft: number;
 };
 
+// Item de GET /me/campaigns: campanha do usuário logado, já com os dias restantes.
+export type MyCampaign = Campaign & { daysLeft: number };
+
 // Corpo de POST /campaigns.
 export type CampaignInput = {
   title: string;

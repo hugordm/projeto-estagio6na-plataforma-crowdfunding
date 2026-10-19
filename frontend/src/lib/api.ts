@@ -4,14 +4,15 @@ import type {
   Campaign,
   CampaignDetail,
   CampaignSearchResult,
+  MyCampaign,
   CampaignFilters,
   CampaignInput,
   CampaignUpdate,
 } from "@/types/campaign";
 import type { ChatMessage } from "@/types/chat";
-import type { Donation, DonationInput } from "@/types/donation";
+import type { Donation, DonationInput, MyDonation } from "@/types/donation";
 import type { Paginated } from "@/types/pagination";
-import { getToken } from "./session";
+import { clearSession, getToken, SESSION_EXPIRED_EVENT } from "./session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -57,6 +58,12 @@ async function request<T>(path: string, { method = "GET", body }: RequestOptions
 
   const data = await response.json().catch(() => null);
   if (!response.ok) {
+    // Token recusado (expirou ou a senha foi redefinida em outro lugar): encerra a sessão local.
+    if (response.status === 401 && token && !path.startsWith("/auth/")) {
+      clearSession();
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
     const message = data?.error ?? `Erro inesperado (${response.status})`;
     throw new ApiError(message, response.status);
   }
@@ -143,6 +150,18 @@ export function generateAiCover(input: { title: string; description: string; cat
   return request<{ url: string }>("/campaigns/ai-cover", { method: "POST", body: input });
 }
 
+// ---------- IA no formulário ----------
+
+// Reescreve a descrição (mais clara, sem inventar fatos). Nada é aplicado sem a confirmação do usuário.
+export function improveDescription(input: { title: string; description: string; category?: string }) {
+  return request<{ description: string }>("/campaigns/ai-description", { method: "POST", body: input });
+}
+
+// Sugere uma das categorias existentes a partir do título e da descrição.
+export function suggestCategory(input: { title: string; description: string }) {
+  return request<{ categoryId: number }>("/campaigns/ai-category", { method: "POST", body: input });
+}
+
 // ---------- Doações ----------
 
 export function getDonations(campaignId: number | string, page = 1, limit = 10) {
@@ -151,6 +170,16 @@ export function getDonations(campaignId: number | string, page = 1, limit = 10) 
 
 export function createDonation(campaignId: number | string, input: DonationInput) {
   return request<unknown>(`/campaigns/${campaignId}/donations`, { method: "POST", body: input });
+}
+
+// ---------- Minha conta ----------
+
+export function getMyCampaigns(page = 1, limit = 9) {
+  return request<Paginated<MyCampaign>>(`/me/campaigns${toQuery({ page, limit })}`);
+}
+
+export function getMyDonations(page = 1, limit = 10) {
+  return request<Paginated<MyDonation>>(`/me/donations${toQuery({ page, limit })}`);
 }
 
 // ---------- Chat de suporte ----------

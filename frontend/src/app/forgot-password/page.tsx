@@ -1,13 +1,27 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { errorMessage, forgotPassword } from "@/lib/api";
+import { emailFromParam } from "@/lib/email-param";
 import { ErrorMessage } from "@/components/StatusMessage";
+import { BackButton } from "@/components/BackButton";
+
+// O Next exige <Suspense> em volta de componentes que usam useSearchParams.
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense>
+      <ForgotPasswordForm />
+    </Suspense>
+  );
+}
 
 // Pede o link de redefinição de senha por e-mail.
-export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+function ForgotPasswordForm() {
+  const searchParams = useSearchParams();
+  // Vindo do cadastro (?email=...), o e-mail já chega preenchido (só se tiver formato válido).
+  const [email, setEmail] = useState(() => emailFromParam(searchParams.get("email")));
   const [error, setError] = useState("");
   const [sentMessage, setSentMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +43,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm">
+      <BackButton fallbackHref="/" />
       <h1 className="mb-2 text-2xl font-bold">Esqueci minha senha</h1>
       <p className="mb-6 text-sm text-zinc-600">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p>
 

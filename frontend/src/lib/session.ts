@@ -14,6 +14,9 @@ import type { AuthResponse } from "@/types/user";
 
 const STORAGE_KEY = "crowdfunding:session";
 
+// Disparado quando a API recusa o token (expirou ou a senha foi trocada): o AuthContext encerra a sessão.
+export const SESSION_EXPIRED_EVENT = "crowdfunding:session-expired";
+
 export function loadSession(): AuthResponse | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);

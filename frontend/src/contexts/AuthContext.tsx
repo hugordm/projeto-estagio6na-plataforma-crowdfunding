@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import * as api from "@/lib/api";
-import { clearSession, loadSession, saveSession } from "@/lib/session";
+import { clearSession, loadSession, saveSession, SESSION_EXPIRED_EVENT } from "@/lib/session";
 import type { AuthResponse, User } from "@/types/user";
 
 // Sobre o armazenamento do token no localStorage (e seus riscos), veja src/lib/session.ts.
@@ -29,6 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura única de um sistema externo (localStorage)
     setSession(loadSession());
     setReady(true);
+  }, []);
+
+  // A API recusou o token (ver lib/api.ts): some com o usuário da tela; páginas protegidas levam ao login.
+  useEffect(() => {
+    const handleExpired = () => setSession(null);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
   }, []);
 
   function startSession(data: AuthResponse) {

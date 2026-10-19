@@ -6,15 +6,18 @@ import { CampaignImage } from "./CampaignImage";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
 
+type CampaignCardProps = {
+  campaign: Campaign;
+  asLink?: boolean; // false: mesmo visual, mas sem ser um link (pré-visualização, "Minha conta")
+  goalText?: string; // texto no lugar da meta formatada (pré-visualização com a meta ainda vazia)
+};
+
 // Card da listagem: o card inteiro é um link para o detalhe da campanha.
-export function CampaignCard({ campaign }: { campaign: Campaign }) {
-  return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="card flex flex-col overflow-hidden transition-shadow hover:shadow-md"
-    >
+export function CampaignCard({ campaign, asLink = true, goalText }: CampaignCardProps) {
+  const content = (
+    <>
       <div className="relative">
-        <CampaignImage src={campaign.imageUrl} alt={campaign.title} className="h-40 w-full" />
+        <CampaignImage src={campaign.imageUrl} alt={campaign.title} className="aspect-video w-full" />
         {campaign.imageGeneratedByAi && (
           <div className="absolute bottom-2 left-2">
             <AiBadge />
@@ -34,11 +37,19 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
           <ProgressBar progress={campaign.progress} />
           <p className="text-sm">
             <span className="font-semibold">{formatCurrency(campaign.raisedAmount)}</span>
-            <span className="text-zinc-600"> de {formatCurrency(campaign.goalAmount)}</span>
+            <span className="text-zinc-600"> de {goalText ?? formatCurrency(campaign.goalAmount)}</span>
           </p>
           <p className="text-xs text-zinc-500">{formatDaysLeft(daysUntil(campaign.deadline), campaign.status)}</p>
         </div>
       </div>
+    </>
+  );
+
+  if (!asLink) return <div className="card flex flex-col overflow-hidden">{content}</div>;
+
+  return (
+    <Link href={`/campaigns/${campaign.id}`} className="card flex flex-col overflow-hidden transition-shadow hover:shadow-md">
+      {content}
     </Link>
   );
 }

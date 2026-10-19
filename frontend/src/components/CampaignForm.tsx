@@ -1,48 +1,79 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { errorMessage, getCategories } from "@/lib/api";
+import {
+  DESCRIPTION_MAX,
+  GOAL_HINT,
+  TITLE_MAX,
+  validateAll,
+  validateField,
+  type CampaignField,
+  type CampaignFieldValues,
+} from "@/lib/campaign-rules";
+import { dateInputToIso, isoToDateInput } from "@/lib/date-input";
+import { apiToMoneyInput, moneyInputToApi } from "@/lib/money-input";
+import { goBack } from "@/lib/navigation";
+import { confirmLeave } from "@/lib/unsaved-changes";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import type { CampaignDetail, CampaignInput } from "@/types/campaign";
 import type { Category } from "@/types/category";
-import { AiCoverGenerator } from "./AiCoverGenerator";
-import { ImageField } from "./ImageField";
+import { CampaignPreview } from "./CampaignPreview";
+import { CategorySuggestion } from "./CategorySuggestion";
+import { CoverPicker } from "./CoverPicker";
+import { DeadlineInput } from "./DeadlineInput";
+import { DescriptionAssistant } from "./DescriptionAssistant";
+import { FormField } from "./FormField";
+import { MoneyInput } from "./MoneyInput";
 import { ErrorMessage } from "./StatusMessage";
 
-// Valores enviados pelo formulário. imageUrl null = sem imagem (na edição, remove a atual).
+// Valores enviados pelo formulário, já no formato da API. imageUrl null = sem imagem (na edição, remove a atual).
 export type CampaignFormValues = Omit<CampaignInput, "imageUrl"> & { imageUrl: string | null };
 
 type CampaignFormProps = {
-  // Na edição, os campos começam com os dados atuais da campanha.
-  initial?: CampaignDetail;
+  initial?: CampaignDetail; // na edição, os campos começam com os dados atuais da campanha
   submitLabel: string;
+  cancelHref: string; // para onde o "Cancelar" leva se não houver página anterior do site
   onSubmit: (values: CampaignFormValues) => Promise<void>;
 };
 
-// "2026-12-31T23:59:59.000Z" -> "2026-12-31" (formato do <input type="date">, no fuso local).
-function toDateInput(iso: string): string {
-  const date = new Date(iso);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+const FIELD_ORDER: CampaignField[] = ["title", "description", "goalAmount", "deadline", "categoryId"];
+
+function initialValues(initial?: CampaignDetail): CampaignFieldValues & { imageUrl: string } {
+  return {
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    goalAmount: initial ? apiToMoneyInput(initial.goalAmount) : "",
+    deadline: initial ? isoToDateInput(initial.deadline) : "",
+    categoryId: initial ? String(initial.categoryId) : "",
+    imageUrl: initial?.imageUrl ?? "",
+  };
 }
 
-// "2026-12-31" -> ISO do fim desse dia no fuso local (a campanha vale o dia inteiro).
-function fromDateInput(value: string): string {
-  return new Date(`${value}T23:59:59`).toISOString();
-}
+// Formulário compartilhado pelas páginas de criação e edição de campanha, com validação por campo,
+// capa (arquivo, IA ou URL), aviso de alterações não salvas e pré-visualização do card.
+export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: CampaignFormProps) {
+  const router = useRouter();
+  const [start] = useState(() => initialValues(initial)); // para saber se algo mudou
 
-// Formulário compartilhado pelas páginas de criação e edição de campanha.
-export function CampaignForm({ initial, submitLabel, onSubmit }: CampaignFormProps) {
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [goalAmount, setGoalAmount] = useState(initial?.goalAmount ?? "");
-  const [deadline, setDeadline] = useState(initial ? toDateInput(initial.deadline) : "");
-  const [categoryId, setCategoryId] = useState(initial ? String(initial.categoryId) : "");
-  const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
+  const [title, setTitle] = useState(start.title);
+  const [description, setDescription] = useState(start.description);
+  const [goalAmount, setGoalAmount] = useState(start.goalAmount);
+  const [deadline, setDeadline] = useState(start.deadline);
+  const [categoryId, setCategoryId] = useState(start.categoryId);
+  const [imageUrl, setImageUrl] = useState(start.imageUrl);
+  const [imageFromAi, setImageFromAi] = useState(initial?.imageGeneratedByAi ?? false);
+  const [categoryFromAi, setCategoryFromAi] = useState(false); // mostra o aviso "Sugerida por IA"
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [error, setError] = useState("");
+  const [touched, setTouched] = useState<Set<CampaignField>>(new Set()); // campos que já mostram erro
+  const [error, setError] = useState(""); // erro geral (ex.: resposta da API)
   const [submitting, setSubmitting] = useState(false);
+
+  const values: CampaignFieldValues = { title, description, goalAmount, deadline, categoryId };
+  const dirty = FIELD_ORDER.some((field) => values[field] !== start[field]) || imageUrl !== start.imageUrl;
+  useUnsavedChangesWarning(dirty && !submitting);
 
   useEffect(() => {
     getCategories()
@@ -50,12 +81,43 @@ export function CampaignForm({ initial, submitLabel, onSubmit }: CampaignFormPro
       .catch((err) => setError(`Não foi possível carregar as categorias: ${errorMessage(err)}`));
   }, []);
 
+  // A mensagem aparece só depois que a pessoa sai do campo (onBlur) ou tenta enviar:
+  // um campo vazio que acabou de receber o foco nunca mostra erro.
+  function errorFor(field: CampaignField): string {
+    return touched.has(field) ? validateField(field, values) : "";
+  }
+
+  function touch(field: CampaignField) {
+    setTouched((current) => new Set(current).add(field));
+  }
+
+  function handleCoverChange(url: string, fromAi: boolean) {
+    setImageUrl(url);
+    setImageFromAi(fromAi);
+  }
+
+  function handleCategorySuggestion(id: number) {
+    setCategoryId(String(id));
+    setCategoryFromAi(true);
+    touch("categoryId");
+  }
+
+  const selectedCategory = categories.find((c) => String(c.id) === categoryId);
+
+  function handleCancel() {
+    if (confirmLeave()) goBack(router, cancelHref);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setTouched(new Set(FIELD_ORDER));
 
-    if (!(Number(goalAmount) > 0)) {
-      setError("A meta deve ser maior que zero.");
+    const errors = validateAll(values);
+    const firstInvalid = FIELD_ORDER.find((field) => errors[field]);
+    if (firstInvalid) {
+      setError("Corrija os campos destacados antes de continuar.");
+      document.getElementById(firstInvalid)?.focus();
       return;
     }
 
@@ -64,111 +126,150 @@ export function CampaignForm({ initial, submitLabel, onSubmit }: CampaignFormPro
       await onSubmit({
         title: title.trim(),
         description: description.trim(),
-        goalAmount,
-        deadline: fromDateInput(deadline),
+        goalAmount: moneyInputToApi(goalAmount), // "5.000,00" -> "5000.00"
+        deadline: dateInputToIso(deadline),
         categoryId: Number(categoryId),
         imageUrl: imageUrl || null,
       });
     } catch (err) {
       setError(errorMessage(err));
-    } finally {
       setSubmitting(false);
     }
   }
 
+  const fieldProps = (field: CampaignField) => ({
+    id: field,
+    onBlur: () => touch(field),
+    "aria-invalid": Boolean(errorFor(field)),
+    "aria-describedby": `${field}-help`,
+  });
+
   return (
-    <form onSubmit={handleSubmit} className="card space-y-4 p-6">
-      <div>
-        <label htmlFor="title" className="label">
-          Título
-        </label>
-        <input
-          id="title"
-          required
-          minLength={3}
-          maxLength={120}
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </div>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <form onSubmit={handleSubmit} noValidate className="card space-y-5 p-6">
+        <FormField id="title" label="Título" error={errorFor("title")} count={title.length} max={TITLE_MAX}>
+          <input
+            {...fieldProps("title")}
+            maxLength={TITLE_MAX}
+            className="input"
+            placeholder="Ex.: Reforma da biblioteca comunitária do bairro"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </FormField>
 
-      <div>
-        <label htmlFor="description" className="label">
-          Descrição
-        </label>
-        <textarea
+        <FormField
           id="description"
-          required
-          minLength={10}
-          maxLength={5000}
-          rows={6}
-          className="input"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="goalAmount" className="label">
-            Meta (R$)
-          </label>
-          <input
-            id="goalAmount"
-            type="number"
-            min="0.01"
-            step="0.01"
-            required
-            className="input"
-            value={goalAmount}
-            onChange={(e) => setGoalAmount(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="deadline" className="label">
-            Prazo
-          </label>
-          <input
-            id="deadline"
-            type="date"
-            required
-            className="input"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="categoryId" className="label">
-          Categoria
-        </label>
-        <select
-          id="categoryId"
-          required
-          className="input"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          label="Descrição"
+          error={errorFor("description")}
+          hint="Conte quem será ajudado, por que isso importa e como o dinheiro será usado."
+          count={description.length}
+          max={DESCRIPTION_MAX}
         >
-          <option value="">Selecione...</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          <textarea
+            {...fieldProps("description")}
+            maxLength={DESCRIPTION_MAX}
+            rows={6}
+            className="input"
+            placeholder="Ex.: A biblioteca atende 200 crianças por semana, mas o telhado tem goteiras. Com a meta, vamos trocar as telhas e comprar estantes novas."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </FormField>
+        <DescriptionAssistant
+          title={title}
+          description={description}
+          categoryName={selectedCategory?.name}
+          onUse={(text) => {
+            setDescription(text);
+            touch("description");
+          }}
+        />
 
-      <ImageField value={imageUrl} onChange={setImageUrl} />
-      <AiCoverGenerator title={title} description={description} categoryId={categoryId} onAccept={setImageUrl} />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <FormField id="goalAmount" label="Meta" error={errorFor("goalAmount")} hint={`Quanto quer arrecadar. ${GOAL_HINT}`}>
+            <MoneyInput
+              id="goalAmount"
+              placeholder="5.000,00"
+              value={goalAmount}
+              onChange={setGoalAmount}
+              onBlur={() => touch("goalAmount")}
+              invalid={Boolean(errorFor("goalAmount"))}
+            />
+          </FormField>
 
-      {error && <ErrorMessage message={error} />}
+          <FormField id="deadline" label="Prazo" error={errorFor("deadline")} hint="Último dia para receber doações.">
+            <DeadlineInput
+              id="deadline"
+              value={deadline}
+              onChange={setDeadline}
+              onBlur={() => touch("deadline")}
+              invalid={Boolean(errorFor("deadline"))}
+            />
+          </FormField>
+        </div>
 
-      <button type="submit" className="btn btn-primary" disabled={submitting}>
-        {submitting ? "Salvando..." : submitLabel}
-      </button>
-    </form>
+        <FormField
+          id="categoryId"
+          label="Categoria"
+          error={errorFor("categoryId")}
+          hint={categoryFromAi ? "Sugerida por IA. Você pode alterar." : undefined}
+          action={<CategorySuggestion title={title} description={description} onSuggest={handleCategorySuggestion} />}
+        >
+          <select
+            {...fieldProps("categoryId")}
+            className="input"
+            value={categoryId}
+            onChange={(e) => {
+              setCategoryId(e.target.value);
+              setCategoryFromAi(false); // escolha manual: tira o aviso de sugestão
+            }}
+          >
+            <option value="">Selecione...</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <CoverPicker
+          value={imageUrl}
+          onChange={handleCoverChange}
+          title={title}
+          description={description}
+          categoryId={categoryId}
+        />
+
+        {error && <ErrorMessage message={error} />}
+
+        {/* Barra de ações fixa no rodapé do formulário, sempre visível ao rolar. data-sticky-actions
+            faz o botão do chatbot subir em telas estreitas para não cobri-la (globals.css). */}
+        <div
+          data-sticky-actions
+          className="sticky bottom-0 z-20 -mx-6 -mb-6 flex flex-wrap justify-end gap-3 rounded-b-lg border-t border-zinc-200 bg-white/95 px-6 py-3 backdrop-blur"
+        >
+          <button type="button" className="btn btn-secondary" onClick={handleCancel} disabled={submitting}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? "Salvando..." : submitLabel}
+          </button>
+        </div>
+      </form>
+
+      <aside className="lg:sticky lg:top-4 lg:self-start">
+        <CampaignPreview
+          title={title}
+          description={description}
+          goalAmount={goalAmount}
+          deadline={deadline}
+          category={selectedCategory}
+          imageUrl={imageUrl}
+          imageFromAi={imageFromAi}
+        />
+      </aside>
+    </div>
   );
 }

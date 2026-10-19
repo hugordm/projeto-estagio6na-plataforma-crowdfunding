@@ -41,7 +41,21 @@ body {
     @apply bg-violet-600 text-white hover:bg-violet-700;
   }
 
+  /* Ações de IA secundárias (ex.: "Melhorar descrição com IA", "Sugerir categoria"). */
+  .btn-ai-secondary {
+    @apply border border-violet-300 bg-violet-50 text-violet-800 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:border-zinc-200 disabled:bg-zinc-50 disabled:text-zinc-400;
+  }
+
   .card {
     @apply rounded-lg border border-zinc-200 bg-white shadow-sm;
+  }
+}
+
+/* Página com barra de ações fixa no rodapé (formulário de campanha): em telas sem a coluna lateral,
+   o botão flutuante do chatbot sobe para não cobrir os botões. Fica fora de @layer para valer
+   sobre as utilidades do Tailwind (bottom-4). */
+@media (max-width: 1023.98px) {
+  body:has([data-sticky-actions]) .chat-widget {
+    bottom: 5.25rem;
   }
 }

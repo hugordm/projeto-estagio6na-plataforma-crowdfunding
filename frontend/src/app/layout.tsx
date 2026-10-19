@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Navbar } from "@/components/Navbar";
+import { NavigationTracker } from "@/components/NavigationTracker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
+          <NavigationTracker />
           <Navbar />
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
           <ChatWidget />

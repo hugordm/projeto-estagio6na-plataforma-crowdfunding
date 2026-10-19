@@ -8,6 +8,7 @@ const MAX_CHARS = 1000; // mesmo limite do backend
 const HISTORY_SENT = 10; // o backend também usa só as 10 últimas
 
 // Botão flutuante + janela de chat de suporte, presente em todas as páginas (fica no layout).
+// A classe chat-widget permite subir o botão em páginas com barra de ações fixa (globals.css).
 // O histórico fica só na memória: some ao recarregar a página.
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
@@ -63,7 +64,7 @@ export function ChatWidget() {
   }
 
   return (
-    <div className="fixed right-4 bottom-4 z-50 flex flex-col items-end gap-3">
+    <div className="chat-widget fixed right-4 bottom-4 z-50 flex flex-col items-end gap-3">
       {open && (
         <div
           id="chat-panel"

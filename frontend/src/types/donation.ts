@@ -12,3 +12,12 @@ export type DonationInput = {
   amount: string;
   message?: string;
 };
+
+// Item de GET /me/donations: doação feita pelo usuário logado.
+export type MyDonation = {
+  id: number;
+  amount: string;
+  message: string | null;
+  createdAt: string;
+  campaign: { id: number; title: string; status: "ACTIVE" | "FINISHED" };
+};

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createCampaign } from "@/lib/api";
 import { CampaignForm, type CampaignFormValues } from "@/components/CampaignForm";
 import { RequireAuth } from "@/components/RequireAuth";
+import { BackButton } from "@/components/BackButton";
 
 // Criação de campanha (somente usuários logados).
 export default function NewCampaignPage() {
@@ -18,9 +19,10 @@ export default function NewCampaignPage() {
 
   return (
     <RequireAuth>
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-5xl">
+        <BackButton fallbackHref="/" />
         <h1 className="mb-6 text-2xl font-bold">Nova campanha</h1>
-        <CampaignForm submitLabel="Criar campanha" onSubmit={handleCreate} />
+        <CampaignForm submitLabel="Criar campanha" cancelHref="/" onSubmit={handleCreate} />
       </div>
     </RequireAuth>
   );

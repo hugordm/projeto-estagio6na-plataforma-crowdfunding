@@ -27,6 +27,9 @@ export function Navbar() {
             {user ? (
               <>
                 <span className="hidden text-zinc-600 sm:inline">Olá, {user.name}</span>
+                <Link href="/me" className="font-medium text-zinc-700 hover:text-emerald-700">
+                  Minha conta
+                </Link>
                 <Link href="/campaigns/new" className="btn btn-primary">
                   Nova campanha
                 </Link>

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { deleteCampaign, errorMessage, getCampaign, updateCampaign } from "@/lib/api";
 import type { CampaignDetail } from "@/types/campaign";
 import { CampaignForm, type CampaignFormValues } from "@/components/CampaignForm";
+import { BackButton } from "@/components/BackButton";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ErrorMessage, Loading } from "@/components/StatusMessage";
 
@@ -90,15 +90,13 @@ function EditCampaign() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
+        <BackButton fallbackHref={`/campaigns/${id}`} />
         <h1 className="text-2xl font-bold">Editar campanha</h1>
-        <Link href={`/campaigns/${id}`} className="text-sm text-emerald-700 underline">
-          Voltar para a campanha
-        </Link>
       </div>
 
-      <CampaignForm initial={campaign} submitLabel="Salvar alterações" onSubmit={handleUpdate} />
+      <CampaignForm initial={campaign} submitLabel="Salvar alterações" cancelHref={`/campaigns/${id}`} onSubmit={handleUpdate} />
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">Ações</h2>
