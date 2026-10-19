@@ -29,7 +29,7 @@ No Prisma 7 o seed é configurado em `prisma.config.ts` (`migrations.seed`) e **
 | `OPENROUTER_EMBEDDING_MODEL` | Modelo de embeddings da busca semântica (recomendado: `baai/bge-m3`, 1024 dimensões) |
 | `OPENROUTER_IMAGE_MODEL` | Modelo de geração de capas (recomendado: `recraft/recraft-v4.1-flash`) |
 | `RESEND_API_KEY` | Chave da API do Resend (envio de e-mail). Sem ela, o link de recuperação só aparece no console (fora de produção) |
-| `MAIL_FROM` | Remetente dos e-mails, ex.: `Crowdfunding <nao-responda@seudominio.com>` (domínio verificado no Resend) |
+| `RESEND_FROM_EMAIL` | Remetente dos e-mails, ex.: `Crowdfunding <nao-responda@seudominio.com>` (domínio verificado no Resend) |
 | `FRONTEND_URL` | URL do frontend usada nos links dos e-mails (padrão `http://localhost:3000`) |
 | `BACKEND_URL` | Endereço público do backend, usado nas URLs das imagens enviadas (padrão `http://localhost:PORT`) |
 
@@ -96,7 +96,7 @@ Listas paginadas retornam `{ data: [...], meta: { page, limit, total, totalPages
 2. `POST /auth/reset-password` confere o hash do token (existe, não usado, não expirado), aplica as regras de senha do cadastro, grava o novo hash bcrypt e marca `usedAt` na mesma transação (uso único, mesmo com requisições simultâneas).
 3. Rate limit (`src/middlewares/rate-limit.ts`, `express-rate-limit`): 10 pedidos a cada 15 min por IP (somando as duas rotas) e 3 por hora por e-mail no `forgot-password`. Os contadores ficam em memória (servidor único). Atrás de um proxy, ative `app.set('trust proxy', 1)` para o IP do cliente ser lido corretamente.
 
-**Como testar o envio real:** crie uma conta no Resend, gere uma API key e preencha `RESEND_API_KEY` e `MAIL_FROM`. Sem domínio verificado, use `MAIL_FROM="Crowdfunding <onboarding@resend.dev>"`: nesse modo o Resend só entrega para o e-mail do dono da conta Resend, então cadastre um usuário com esse e-mail e peça a recuperação. **Sem Resend configurado:** o link aparece no console do servidor (apenas quando `NODE_ENV` não é `production`).
+**Como testar o envio real:** crie uma conta no Resend, gere uma API key e preencha `RESEND_API_KEY` e `RESEND_FROM_EMAIL`. Sem domínio verificado, use `RESEND_FROM_EMAIL="Crowdfunding <onboarding@resend.dev>"`: nesse modo o Resend só entrega para o e-mail do dono da conta Resend, então cadastre um usuário com esse e-mail e peça a recuperação. **Sem Resend configurado:** o link aparece no console do servidor (apenas quando `NODE_ENV` não é `production`).
 
 ## Rede e conexão com o Neon
 

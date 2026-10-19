@@ -42,7 +42,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
     if (process.env.NODE_ENV !== 'production') {
       console.warn(`[recuperação de senha] E-mail não configurado. Link de teste para ${email}: ${link}`);
     } else {
-      console.error('[recuperação de senha] E-mail não configurado (RESEND_API_KEY/MAIL_FROM).');
+      console.error('[recuperação de senha] E-mail não configurado (RESEND_API_KEY/RESEND_FROM_EMAIL).');
     }
     return;
   }

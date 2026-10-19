@@ -14,14 +14,14 @@ export type Email = {
 };
 
 export function isMailerConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
 // Lança erro se o envio falhar; quem chama decide se isso é grave (na recuperação de senha, só registramos log).
 export async function sendEmail(email: Email): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
-  if (!apiKey || !from) throw new Error('E-mail não configurado (RESEND_API_KEY ou MAIL_FROM ausente)');
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) throw new Error('E-mail não configurado (RESEND_API_KEY ou RESEND_FROM_EMAIL ausente)');
 
   const response = await fetch(RESEND_URL, {
     method: 'POST',

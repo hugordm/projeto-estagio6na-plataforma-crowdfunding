@@ -30,7 +30,7 @@ Projeto de estágio: plataforma de "vaquinhas" online em que usuários criam cam
 | `PORT` | não | Porta da API (padrão 3001) |
 | `BACKEND_URL` | não | Endereço público da API, usado nas URLs das imagens (padrão `http://localhost:PORT`) |
 | `FRONTEND_URL` | não | Endereço do frontend, usado nos links de e-mail (padrão `http://localhost:3000`) |
-| `RESEND_API_KEY`, `MAIL_FROM` | para e-mail | Envio do link de recuperação de senha |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | para e-mail | Envio do link de recuperação de senha |
 | `OPENROUTER_API_KEY` | para IA | Chave do OpenRouter |
 | `OPENROUTER_CHAT_MODEL` | para o chatbot | Recomendado: `google/gemini-3.5-flash-lite` |
 | `OPENROUTER_EMBEDDING_MODEL` | para a busca inteligente | Recomendado: `baai/bge-m3` (a coluna é `vector(1024)`) |
