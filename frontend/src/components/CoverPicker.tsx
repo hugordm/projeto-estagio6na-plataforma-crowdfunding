@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFeatures } from "@/contexts/FeaturesContext";
 import { IMAGE_RULES_TEXT, useImageUpload } from "@/hooks/useImageUpload";
 import { AiCoverGenerator } from "./AiCoverGenerator";
 import { ImageDropzone, SparkIcon } from "./ImageDropzone";
@@ -25,8 +26,12 @@ type CoverPickerProps = {
 
 // Bloco único da imagem de capa: abas para escolher a origem e UMA área de pré-visualização
 // (ImageDropzone), que também aceita arrastar e soltar ou clicar para escolher um arquivo.
+// A aba "Gerar com IA" só aparece quando a capa por IA está configurada no servidor.
 export function CoverPicker({ value, onChange, title, description, categoryId }: CoverPickerProps) {
-  const [tab, setTab] = useState<Tab>("file");
+  const { aiCover } = useFeatures();
+  const [selectedTab, setTab] = useState<Tab>("file");
+  const tab: Tab = selectedTab === "ai" && !aiCover ? "file" : selectedTab; // aba de IA some se o recurso desligar
+  const tabs = aiCover ? TABS : TABS.filter((item) => item.id !== "ai");
   const [candidate, setCandidate] = useState(""); // sugestão da IA ainda não aceita
   const { upload, uploading, error: uploadError, clearError } = useImageUpload((url) => onChange(url, false));
 
@@ -49,7 +54,7 @@ export function CoverPicker({ value, onChange, title, description, categoryId }:
       <legend className="label">Imagem de capa (opcional)</legend>
 
       <div role="tablist" aria-label="Origem da imagem de capa" className="flex flex-wrap gap-1 rounded-lg bg-zinc-100 p-1">
-        {TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.id}
             type="button"

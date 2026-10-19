@@ -9,7 +9,7 @@ import { formatCurrency, formatDate, formatDaysLeft } from "@/lib/format";
 import type { CampaignDetail } from "@/types/campaign";
 import { AiBadge } from "@/components/AiBadge";
 import { BackButton } from "@/components/BackButton";
-import { CampaignImage } from "@/components/CampaignImage";
+import { CoverImage } from "@/components/CoverImage";
 import { DonationPanel } from "@/components/DonationPanel";
 import { DonorList } from "@/components/DonorList";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -53,7 +53,7 @@ export default function CampaignPage() {
       <BackButton fallbackHref="/" />
       <div className="grid gap-6 lg:grid-cols-3">
         <article className="space-y-4 lg:col-span-2">
-          <CampaignImage src={campaign.imageUrl} alt={campaign.title} className="h-64 w-full rounded-lg" />
+          <CoverImage src={campaign.imageUrl} alt={campaign.title} size="detail" />
 
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium text-emerald-700">{campaign.category.name}</span>

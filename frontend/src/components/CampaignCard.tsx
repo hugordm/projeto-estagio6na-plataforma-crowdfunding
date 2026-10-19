@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { Campaign } from "@/types/campaign";
 import { daysUntil, formatCurrency, formatDaysLeft } from "@/lib/format";
-import { AiBadge } from "./AiBadge";
-import { CampaignImage } from "./CampaignImage";
+import { CoverImage } from "./CoverImage";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
 
@@ -16,14 +15,7 @@ type CampaignCardProps = {
 export function CampaignCard({ campaign, asLink = true, goalText }: CampaignCardProps) {
   const content = (
     <>
-      <div className="relative">
-        <CampaignImage src={campaign.imageUrl} alt={campaign.title} className="aspect-video w-full" />
-        {campaign.imageGeneratedByAi && (
-          <div className="absolute bottom-2 left-2">
-            <AiBadge />
-          </div>
-        )}
-      </div>
+      <CoverImage src={campaign.imageUrl} alt={campaign.title} size="card" aiGenerated={campaign.imageGeneratedByAi} />
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-2 text-xs">

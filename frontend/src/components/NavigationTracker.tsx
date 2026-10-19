@@ -2,22 +2,39 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { markInternalNavigation } from "@/lib/navigation";
+import { recordInitialPage, recordNavigation } from "@/lib/navigation";
 
-// Fica no layout e não desenha nada: quando a página muda dentro do site e isso cria uma nova
-// entrada no histórico (router.push ou clique em link), registra que existe histórico interno
-// para o botão "Voltar". Redirecionamentos com router.replace (ex.: RequireAuth mandando para
-// /login) não aumentam o histórico e por isso não contam: voltar ali sairia do site.
+// Fica no layout e não desenha nada: mantém a pilha de páginas visitadas (lib/navigation.ts)
+// alinhada ao histórico do navegador, para o botão "Voltar" escolher o destino.
+// Como cada mudança de página entrou no histórico:
+// - evento popstate antes da mudança -> voltar/avançar do navegador;
+// - history.length aumentou -> navegação nova (link ou router.push);
+// - history.length igual -> router.replace (ex.: RequireAuth mandando para /login).
 export function NavigationTracker() {
   const pathname = usePathname();
-  const firstPath = useRef(pathname);
   const historyLength = useRef<number | null>(null);
+  const popped = useRef(false);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      popped.current = true;
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     const previousLength = historyLength.current;
     historyLength.current = window.history.length;
-    if (pathname === firstPath.current || previousLength === null) return;
-    if (window.history.length > previousLength) markInternalNavigation();
+
+    if (previousLength === null) {
+      recordInitialPage(pathname);
+    } else if (popped.current) {
+      recordNavigation(pathname, "pop");
+    } else {
+      recordNavigation(pathname, window.history.length > previousLength ? "push" : "replace");
+    }
+    popped.current = false;
   }, [pathname]);
 
   return null;

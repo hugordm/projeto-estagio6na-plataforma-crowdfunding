@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useFeatures } from "@/contexts/FeaturesContext";
 import { errorMessage, getCategories } from "@/lib/api";
 import {
   DESCRIPTION_MAX,
@@ -55,6 +56,7 @@ function initialValues(initial?: CampaignDetail): CampaignFieldValues & { imageU
 // capa (arquivo, IA ou URL), aviso de alterações não salvas e pré-visualização do card.
 export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: CampaignFormProps) {
   const router = useRouter();
+  const { aiWriting } = useFeatures(); // "Melhorar descrição" e "Sugerir categoria"
   const [start] = useState(() => initialValues(initial)); // para saber se algo mudou
 
   const [title, setTitle] = useState(start.title);
@@ -176,15 +178,17 @@ export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: Cam
             onChange={(e) => setDescription(e.target.value)}
           />
         </FormField>
-        <DescriptionAssistant
-          title={title}
-          description={description}
-          categoryName={selectedCategory?.name}
-          onUse={(text) => {
-            setDescription(text);
-            touch("description");
-          }}
-        />
+        {aiWriting && (
+          <DescriptionAssistant
+            title={title}
+            description={description}
+            categoryName={selectedCategory?.name}
+            onUse={(text) => {
+              setDescription(text);
+              touch("description");
+            }}
+          />
+        )}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField id="goalAmount" label="Meta" error={errorFor("goalAmount")} hint={`Quanto quer arrecadar. ${GOAL_HINT}`}>
@@ -214,7 +218,9 @@ export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: Cam
           label="Categoria"
           error={errorFor("categoryId")}
           hint={categoryFromAi ? "Sugerida por IA. Você pode alterar." : undefined}
-          action={<CategorySuggestion title={title} description={description} onSuggest={handleCategorySuggestion} />}
+          action={
+            aiWriting ? <CategorySuggestion title={title} description={description} onSuggest={handleCategorySuggestion} /> : undefined
+          }
         >
           <select
             {...fieldProps("categoryId")}

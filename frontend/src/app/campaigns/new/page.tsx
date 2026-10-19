@@ -14,7 +14,8 @@ export default function NewCampaignPage() {
   async function handleCreate({ imageUrl, ...values }: CampaignFormValues) {
     // Sem imagem, o campo simplesmente não é enviado.
     const campaign = await createCampaign({ ...values, imageUrl: imageUrl ?? undefined });
-    router.push(`/campaigns/${campaign.id}`);
+    // replace: o formulário sai do histórico, e o "Voltar" da campanha não leva de volta a ele.
+    router.replace(`/campaigns/${campaign.id}`);
   }
 
   return (

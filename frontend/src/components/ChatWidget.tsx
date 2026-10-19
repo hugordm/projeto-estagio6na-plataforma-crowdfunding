@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useFeatures } from "@/contexts/FeaturesContext";
 import { errorMessage, sendChatMessage } from "@/lib/api";
 import type { ChatMessage } from "@/types/chat";
 
 const MAX_CHARS = 1000; // mesmo limite do backend
 const HISTORY_SENT = 10; // o backend também usa só as 10 últimas
 
+// Botão flutuante do chat: só aparece quando o chat por IA está configurado no servidor.
+export function ChatWidget() {
+  const { aiChat } = useFeatures();
+  return aiChat ? <ChatPanel /> : null;
+}
+
 // Botão flutuante + janela de chat de suporte, presente em todas as páginas (fica no layout).
 // A classe chat-widget permite subir o botão em páginas com barra de ações fixa (globals.css).
 // O histórico fica só na memória: some ao recarregar a página.
-export function ChatWidget() {
+function ChatPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");

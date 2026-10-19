@@ -1,0 +1,16 @@
+# Fica fora do contexto do build (e portanto da imagem).
+node_modules
+.next
+dist
+uploads
+.env*
+.git
+.gitignore
+*.tsbuildinfo
+next-env.d.ts
+.claude
+.agents
+.windsurf
+skills-lock.json
+Dockerfile
+.dockerignore

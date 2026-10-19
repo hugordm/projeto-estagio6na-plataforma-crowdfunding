@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useFeatures } from "@/contexts/FeaturesContext";
 import type { Category } from "@/types/category";
 
 type CampaignFiltersProps = {
@@ -22,6 +23,7 @@ export function CampaignFilters({
   onSmartChange,
 }: CampaignFiltersProps) {
   const [text, setText] = useState("");
+  const { semanticSearch } = useFeatures(); // sem embeddings configurados, a opção não aparece
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,13 +58,15 @@ export function CampaignFilters({
           Buscar
         </button>
       </div>
-      <label className="flex items-center gap-2 text-sm text-zinc-700">
-        <input type="checkbox" checked={smart} onChange={(e) => onSmartChange(e.target.checked)} />
-        Busca inteligente
-        <span className="text-xs text-zinc-500">
-          (entende o significado: &quot;ajudar animais&quot; encontra &quot;cirurgia do cachorro&quot;)
-        </span>
-      </label>
+      {semanticSearch && (
+        <label className="flex items-center gap-2 text-sm text-zinc-700">
+          <input type="checkbox" checked={smart} onChange={(e) => onSmartChange(e.target.checked)} />
+          Busca inteligente
+          <span className="text-xs text-zinc-500">
+            (entende o significado: &quot;ajudar animais&quot; encontra &quot;cirurgia do cachorro&quot;)
+          </span>
+        </label>
+      )}
     </form>
   );
 }

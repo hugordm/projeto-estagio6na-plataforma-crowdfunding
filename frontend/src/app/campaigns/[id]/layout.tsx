@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Esta busca roda no servidor do Next. Em Docker, "localhost" é o próprio container do frontend:
+// API_INTERNAL_URL (opcional, só no servidor) aponta para a API pela rede interna (ex.: http://backend:3001).
+function apiUrl(): string {
+  return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+}
+
 const DESCRIPTION_LENGTH = 160;
 
 // A página de detalhe é client-side; o título e a descrição da aba (e de quem recebe o link)
@@ -9,7 +14,7 @@ const DESCRIPTION_LENGTH = 160;
 export async function generateMetadata({ params }: LayoutProps<"/campaigns/[id]">): Promise<Metadata> {
   const { id } = await params;
   try {
-    const response = await fetch(`${API_URL}/campaigns/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${apiUrl()}/campaigns/${encodeURIComponent(id)}`, {
       next: { revalidate: 60 },
       signal: AbortSignal.timeout(3000),
     });

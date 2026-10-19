@@ -56,7 +56,7 @@ function EditCampaign() {
   // imageUrl null remove a imagem atual.
   async function handleUpdate(values: CampaignFormValues) {
     await updateCampaign(id, values);
-    router.push(`/campaigns/${id}`);
+    router.replace(`/campaigns/${id}`); // o formulário de edição sai do histórico
   }
 
   async function handleFinish() {
@@ -81,7 +81,7 @@ function EditCampaign() {
     setBusy(true);
     try {
       await deleteCampaign(id);
-      router.push("/");
+      router.replace("/"); // a campanha excluída não fica no histórico
     } catch (err) {
       // Com doações o backend responde 409 explicando que é preciso encerrar em vez de excluir.
       setActionError(errorMessage(err));

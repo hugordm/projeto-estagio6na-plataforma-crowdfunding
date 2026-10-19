@@ -8,8 +8,9 @@ type BackButtonProps = {
   fallbackHref: string; // para onde ir quando não há página anterior dentro do site
 };
 
-// Seta "Voltar": volta no histórico se a pessoa veio de outra página do site;
-// senão (ex.: abriu o link direto), leva ao endereço de reserva.
+// Seta "Voltar": volta para a página anterior do site, pulando formulários e telas de login
+// (regras em lib/navigation.ts); se não houver nenhuma (ex.: abriu o link direto), vai para o
+// endereço de reserva.
 // Se a página tiver alterações não salvas (formulário), pede confirmação antes.
 export function BackButton({ fallbackHref }: BackButtonProps) {
   const router = useRouter();

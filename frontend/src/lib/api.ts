@@ -10,6 +10,7 @@ import type {
   CampaignUpdate,
 } from "@/types/campaign";
 import type { ChatMessage } from "@/types/chat";
+import type { Features } from "@/types/features";
 import type { Donation, DonationInput, MyDonation } from "@/types/donation";
 import type { Paginated } from "@/types/pagination";
 import { clearSession, getToken, SESSION_EXPIRED_EVENT } from "./session";
@@ -99,6 +100,13 @@ export function forgotPassword(email: string) {
 
 export function resetPassword(token: string, password: string) {
   return request<MessageResponse>("/auth/reset-password", { method: "POST", body: { token, password } });
+}
+
+// ---------- Configuração ----------
+
+// Recursos de IA ligados no servidor (só booleanos).
+export function getFeatures() {
+  return request<Features>("/config/features");
 }
 
 // ---------- Categorias ----------

@@ -2,6 +2,7 @@
 
 import { useRef, useState, type DragEvent } from "react";
 import { ACCEPTED_IMAGE_TYPES } from "@/hooks/useImageUpload";
+import { CoverImage } from "./CoverImage";
 
 type ImageDropzoneProps = {
   src: string; // imagem mostrada ("" = vazia)
@@ -57,8 +58,7 @@ export function ImageDropzone(props: ImageDropzoneProps) {
       className={`relative aspect-video w-full overflow-hidden rounded-lg border-2 border-dashed transition-colors focus-within:ring-2 focus-within:ring-emerald-600 ${border}`}
     >
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
+        <CoverImage src={src} alt={alt} size="preview" />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-sm text-zinc-600">
           <ImageIcon />

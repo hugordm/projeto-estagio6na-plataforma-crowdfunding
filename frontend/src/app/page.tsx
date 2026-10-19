@@ -7,6 +7,7 @@ import type { Category } from "@/types/category";
 import type { Paginated } from "@/types/pagination";
 import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignFilters } from "@/components/CampaignFilters";
+import { useFeatures } from "@/contexts/FeaturesContext";
 import { Pagination } from "@/components/Pagination";
 import { EmptyState, ErrorMessage, Loading } from "@/components/StatusMessage";
 
@@ -18,6 +19,8 @@ export default function HomePage() {
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
   const [smart, setSmart] = useState(false);
+  const { semanticSearch } = useFeatures();
+  const smartSearchOn = smart && semanticSearch; // opção marcada só vale com o recurso ligado
 
   const [categories, setCategories] = useState<Category[]>([]);
   // notice: aviso do backend quando a busca inteligente caiu para a busca por texto.
@@ -36,7 +39,7 @@ export default function HomePage() {
   useEffect(() => {
     let ignore = false;
     const filters = { q, category, page, limit: PAGE_SIZE };
-    const load = smart && q ? searchCampaigns(filters) : getCampaigns(filters);
+    const load = smartSearchOn && q ? searchCampaigns(filters) : getCampaigns(filters);
     load
       .then((data) => {
         if (ignore) return;
@@ -49,7 +52,7 @@ export default function HomePage() {
     return () => {
       ignore = true;
     };
-  }, [q, category, page, smart]);
+  }, [q, category, page, smartSearchOn]);
 
   // Ao mudar um filtro, volta para a primeira página.
   function handleSearch(text: string) {
