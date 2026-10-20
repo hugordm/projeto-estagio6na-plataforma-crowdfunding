@@ -3,7 +3,6 @@ import type { Category } from "@/types/category";
 import type {
   Campaign,
   CampaignDetail,
-  CampaignSearchResult,
   MyCampaign,
   CampaignFilters,
   CampaignInput,
@@ -119,11 +118,6 @@ export function getCategories() {
 
 export function getCampaigns(filters: CampaignFilters = {}) {
   return request<Paginated<Campaign>>(`/campaigns${toQuery(filters)}`);
-}
-
-// Busca inteligente (por significado). Exige o texto da busca (q).
-export function searchCampaigns(filters: CampaignFilters & { q: string }) {
-  return request<CampaignSearchResult>(`/campaigns/search${toQuery(filters)}`);
 }
 
 export function getCampaign(id: number | string) {

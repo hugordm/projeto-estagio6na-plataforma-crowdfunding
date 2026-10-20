@@ -6,7 +6,7 @@ import type { Features } from "@/types/features";
 
 // Enquanto carrega, ou se a consulta falhar, tudo fica desligado: o site funciona sem IA
 // e nenhum botão de IA aparece para depois sumir.
-const ALL_OFF: Features = { semanticSearch: false, aiCover: false, aiChat: false, aiWriting: false };
+const ALL_OFF: Features = { aiCover: false, aiChat: false, aiWriting: false };
 
 const FeaturesContext = createContext<Features>(ALL_OFF);
 

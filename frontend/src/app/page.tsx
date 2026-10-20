@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { errorMessage, getCampaigns, getCategories, searchCampaigns } from "@/lib/api";
+import { errorMessage, getCampaigns, getCategories } from "@/lib/api";
 import type { Campaign } from "@/types/campaign";
 import type { Category } from "@/types/category";
 import type { Paginated } from "@/types/pagination";
 import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignFilters } from "@/components/CampaignFilters";
-import { useFeatures } from "@/contexts/FeaturesContext";
 import { Pagination } from "@/components/Pagination";
 import { EmptyState, ErrorMessage, Loading } from "@/components/StatusMessage";
 
@@ -18,13 +17,9 @@ export default function HomePage() {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
-  const [smart, setSmart] = useState(false);
-  const { semanticSearch } = useFeatures();
-  const smartSearchOn = smart && semanticSearch; // opção marcada só vale com o recurso ligado
 
   const [categories, setCategories] = useState<Category[]>([]);
-  // notice: aviso do backend quando a busca inteligente caiu para a busca por texto.
-  const [result, setResult] = useState<(Paginated<Campaign> & { notice?: string }) | null>(null);
+  const [result, setResult] = useState<Paginated<Campaign> | null>(null);
   const [error, setError] = useState("");
 
   // Categorias para o filtro (se falhar, o filtro só fica vazio).
@@ -34,13 +29,11 @@ export default function HomePage() {
       .catch(() => setCategories([]));
   }, []);
 
-  // Recarrega as campanhas sempre que a busca, a categoria, a página ou o tipo de busca mudam.
-  // A busca inteligente só é usada quando há texto; sem texto, mostra a listagem normal.
+  // Recarrega as campanhas sempre que a busca, a categoria ou a página mudam.
+  // A busca é por texto (título e descrição), feita pela própria listagem (GET /campaigns?q=).
   useEffect(() => {
     let ignore = false;
-    const filters = { q, category, page, limit: PAGE_SIZE };
-    const load = smartSearchOn && q ? searchCampaigns(filters) : getCampaigns(filters);
-    load
+    getCampaigns({ q, category, page, limit: PAGE_SIZE })
       .then((data) => {
         if (ignore) return;
         setResult(data);
@@ -52,7 +45,7 @@ export default function HomePage() {
     return () => {
       ignore = true;
     };
-  }, [q, category, page, smartSearchOn]);
+  }, [q, category, page]);
 
   // Ao mudar um filtro, volta para a primeira página.
   function handleSearch(text: string) {
@@ -62,11 +55,6 @@ export default function HomePage() {
 
   function handleCategoryChange(value: string) {
     setCategory(value);
-    setPage(1);
-  }
-
-  function handleSmartChange(value: boolean) {
-    setSmart(value);
     setPage(1);
   }
 
@@ -80,15 +68,9 @@ export default function HomePage() {
       <CampaignFilters
         categories={categories}
         category={category}
-        smart={smart}
         onSearch={handleSearch}
         onCategoryChange={handleCategoryChange}
-        onSmartChange={handleSmartChange}
       />
-
-      {result?.notice && (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{result.notice}</p>
-      )}
 
       {error ? (
         <ErrorMessage message={error} />

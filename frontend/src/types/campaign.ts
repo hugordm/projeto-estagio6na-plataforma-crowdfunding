@@ -1,5 +1,4 @@
 import type { Category } from "./category";
-import type { PaginationMeta } from "./pagination";
 
 export type CampaignStatus = "ACTIVE" | "FINISHED";
 
@@ -47,15 +46,6 @@ export type CampaignInput = {
 export type CampaignUpdate = Partial<Omit<CampaignInput, "imageUrl">> & {
   status?: CampaignStatus;
   imageUrl?: string | null;
-};
-
-// Resposta de GET /campaigns/search: lista paginada + modo usado. Se a IA falhar, o backend
-// usa a busca por texto (mode "text") e explica em "notice".
-export type CampaignSearchResult = {
-  data: (Campaign & { similarity?: number })[];
-  meta: PaginationMeta;
-  mode: "semantic" | "text";
-  notice?: string;
 };
 
 // Filtros de GET /campaigns.
