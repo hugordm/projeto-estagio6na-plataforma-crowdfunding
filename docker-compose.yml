@@ -1,0 +1,89 @@
+# Plataforma de Crowdfunding em containers: backend (API) e frontend (Next.js).
+# Banco: por padrão o Neon (DATABASE_URL do backend/.env). Perfil opcional "local-db": Postgres + pgvector local.
+#
+#   docker compose up --build                     (ou docker-compose up --build)
+#   docker compose --profile local-db up --build  (com LOCAL_DATABASE_URL, veja .env.example da raiz)
+#
+# Variáveis deste arquivo (portas, URLs públicas, UID): .env da raiz (modelo em .env.example).
+# Os segredos ficam em backend/.env e frontend/.env.local (env_file) e não entram nas imagens.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        APP_UID: ${APP_UID:-1000}
+    image: crowdfunding-backend
+    # backend/.env traz os segredos, inclusive DOCS_USER e DOCS_PASSWORD (login HTTP Basic de /docs),
+    # STORAGE_PROVIDER e CLOUDINARY_* (armazenamento das imagens). Não repita essas variáveis em
+    # "environment": lá, um valor vazio sobrescreveria o do env_file.
+    env_file: ./backend/.env
+    environment:
+      PORT: "3001"
+      # URL pública da API (usada nas URLs das imagens) e do frontend (CORS e links dos e-mails).
+      BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:3001}
+      FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:3000}
+      # Com o perfil local-db: postgresql://crowdfunding:crowdfunding@db:5432/crowdfunding
+      LOCAL_DATABASE_URL: ${LOCAL_DATABASE_URL:-}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      # Imagens do provedor local (STORAGE_PROVIDER=local) e as antigas, mesmo depois de trocar para o Cloudinary.
+      - ./backend/uploads:/app/uploads
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Embutida no código do navegador no build: precisa ser a URL que o navegador alcança.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_BACKEND_URL:-http://localhost:3001}
+    image: crowdfunding-frontend
+    env_file: ./frontend/.env.local
+    environment:
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      # O servidor do Next (metadados da página da campanha) fala com a API pela rede interna.
+      API_INTERNAL_URL: http://backend:3001
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # Opcional: banco local com pgvector, para rodar sem internet (perfil "local-db").
+  db:
+    image: pgvector/pgvector:0.8.6-pg18
+    profiles: ["local-db"]
+    environment:
+      POSTGRES_USER: crowdfunding
+      POSTGRES_PASSWORD: crowdfunding
+      POSTGRES_DB: crowdfunding
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crowdfunding -d crowdfunding"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:

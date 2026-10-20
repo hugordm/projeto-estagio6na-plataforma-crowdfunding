@@ -240,33 +240,33 @@ Content-Type: application/json
 { "imageUrl": null }
 
 # =====================================================================
-# Busca semântica (embeddings + pgvector)
-# Resposta: { data: [...campanha, similarity], meta, mode: "semantic" | "text", notice? }.
-# Se a IA falhar ou não estiver configurada, usa a busca textual (mode "text") e explica em "notice".
+# Busca por texto
+# Procura o texto no título e na descrição (a mesma busca da listagem com ?q=).
+# Resposta no formato da listagem: { data: [...campanhas], meta }.
 # Rate limit: 30 buscas por minuto por usuário/IP.
 # =====================================================================
 
-### 19. Busca por significado ("animal doente" encontra "cirurgia do cachorro")
-# curl -s -G "$BASE/campaigns/search" --data-urlencode "q=ajudar animal doente"
-GET {{baseUrl}}/campaigns/search?q=ajudar%20animal%20doente
+### 19. Busca por texto
+# curl -s -G "$BASE/campaigns/search" --data-urlencode "q=cachorro"
+GET {{baseUrl}}/campaigns/search?q=cachorro
 
 ### 19b. Com filtro de categoria (id ou nome) e paginação
-# curl -s -G "$BASE/campaigns/search" --data-urlencode "q=tecnologia na escola" -d category=3 -d page=1 -d limit=10
-GET {{baseUrl}}/campaigns/search?q=tecnologia%20na%20escola&category=3&page=1&limit=10
+# curl -s -G "$BASE/campaigns/search" --data-urlencode "q=escola" -d category=3 -d page=1 -d limit=10
+GET {{baseUrl}}/campaigns/search?q=escola&category=3&page=1&limit=10
 
 ### 19c. Sem q (400)
 # curl -s "$BASE/campaigns/search"
 GET {{baseUrl}}/campaigns/search
 
 # =====================================================================
-# Capa gerada por IA
-# O prompt é montado pelo backend (estilo ilustrativo, sem texto, sem pessoas reais).
+# Capa gerada por IA (SVG desenhado pelo Claude, COVER_PROVIDER=anthropic-svg)
+# O prompt é montado pelo backend (ilustração plana, sem texto, sem pessoas reais).
 # Limites: 5 capas por usuário a cada 24 h (tabela AiImageGeneration) e 3 pedidos a cada 10 min.
 # A imagem é salva pelo mesmo storage dos uploads. Ao salvar a campanha com essa URL,
 # o backend marca imageGeneratedByAi = true (o cliente não envia esse campo).
 # =====================================================================
 
-### 20. Gerar capa (201 -> { "url": ".../uploads/<uuid>.png" })
+### 20. Gerar capa (201 -> { "url": ".../uploads/<uuid>.svg" }, ou a URL do Cloudinary)
 # Erros: 400 (validação), 401, 429 (limite), 503 (IA não configurada, sem créditos ou fora do ar), 422 (conteúdo recusado)
 # curl -s -X POST $BASE/campaigns/ai-cover -H "Authorization: Bearer $TOKEN_ANA" -H 'Content-Type: application/json' -d '{"title":"Horta comunitária","description":"Uma horta para as famílias do bairro.","categoryId":6}'
 POST {{baseUrl}}/campaigns/ai-cover
@@ -309,8 +309,8 @@ Content-Type: application/json
 
 # =====================================================================
 # Provedores de IA (texto)
-# O /chat usa CHAT_PROVIDER: "anthropic" (Claude Haiku 5.5) ou "openrouter". A requisição e a resposta
-# são as mesmas nos dois casos. Provedor sem chave, sem saldo ou fora do ar: 503 com mensagem amigável.
+# O /chat usa a Anthropic (Claude Haiku 5.5, CHAT_PROVIDER=anthropic, o padrão).
+# Provedor sem chave, sem saldo ou fora do ar: 503 com mensagem amigável.
 # Diagnóstico sem custo relevante: npx tsx scripts/check-ai.ts
 # =====================================================================
 
@@ -396,7 +396,7 @@ Authorization: Bearer {{tokenAna}}
 # Configuração pública
 # =====================================================================
 
-### 27. Recursos de IA ligados (200 -> { "semanticSearch": false, "aiCover": true, "aiChat": true, "aiWriting": true })
+### 27. Recursos de IA ligados (200 -> { "aiCover": true, "aiChat": true, "aiWriting": true })
 # Só booleanos: nenhum valor do .env, nome de variável ou modelo. O frontend esconde o que estiver false.
 # curl -s $BASE/config/features
 GET {{baseUrl}}/config/features

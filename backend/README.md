@@ -1,10 +1,10 @@
 # Backend: Plataforma de Crowdfunding
 
-API REST em Node.js, Express 5 e TypeScript (ESM), com Prisma 7 (driver adapter `@prisma/adapter-pg`) e PostgreSQL no Neon com a extensão pgvector. Visão geral do projeto, modelo de dados, lista completa de endpoints e decisões técnicas: [`../README.md`](../README.md). Requisições de teste: [`docs/requests.http`](docs/requests.http).
+API REST em Node.js, Express 5 e TypeScript (ESM), com Prisma 7 (driver adapter `@prisma/adapter-pg`) e PostgreSQL no Neon. Visão geral do projeto, modelo de dados, lista completa de endpoints e decisões técnicas: [`../README.md`](../README.md). Requisições de teste: [`docs/requests.http`](docs/requests.http).
 
 ## 1. Como rodar
 
-Pré-requisitos: Node.js 20 ou superior, npm e um PostgreSQL com pgvector (ex.: Neon).
+Pré-requisitos: Node.js 20 ou superior, npm e um PostgreSQL com a extensão pgvector disponível (ex.: Neon), exigida só por uma migration antiga (seção 8).
 
 ```bash
 cp .env.example .env        # preencha pelo menos DATABASE_URL e JWT_SECRET
@@ -31,10 +31,9 @@ As variáveis de ambiente estão descritas na seção 9 do [README da raiz](../R
 | `npm start` | Roda o servidor compilado (`node dist/server.js`). Usado pela imagem Docker. |
 | `npm run docs:check` | Valida a especificação OpenAPI e confere se toda rota registrada no Express está documentada (e vice-versa). |
 | `npm run lint` | ESLint (regras recomendadas do ESLint e do `typescript-eslint`, sem checagem por tipos). |
-| `npm run check:ai` | Diagnóstico da IA: provedores ativos, variáveis definidas (sem valores), recursos ligados, teste de chat e de embeddings. `-- --image` e `-- --cover` testam a geração de capa (com custo). |
+| `npm run check:ai` | Diagnóstico da IA (Anthropic): provedores ativos, variáveis definidas (sem valores), recursos ligados e teste de chat. `-- --cover` testa a geração da capa SVG (com custo). |
 | `npm run seed:demo` / `npm run seed:demo:clean` | Cria / apaga os dados de demonstração (seção 9). |
 | `npm run cleanup:uploads` | Lista imagens órfãs do provedor ativo; com `-- --apply` apaga (Cloudinary: `-- --apply --confirm-cloudinary`) (seção 6). |
-| `npx tsx scripts/backfill-embeddings.ts [--all]` | Gera os embeddings que faltam (ou refaz todos, com `--all`). |
 
 ## 3. Estrutura de `src/`
 
@@ -65,8 +64,7 @@ src/
 │   ├── donation.service.ts        Regras de doação e listas de doações.
 │   ├── category.service.ts        Categorias.
 │   ├── storage.service.ts         Interface Storage: disco (uploads/) ou Cloudinary, por STORAGE_PROVIDER.
-│   ├── embedding.service.ts       Embedding da campanha (geração em segundo plano).
-│   ├── search.service.ts          Busca semântica e busca textual para o chat.
+│   ├── search.service.ts          Busca por texto (GET /campaigns/search) e busca textual para o chat.
 │   ├── ai-usage.service.ts        Limite diário de capas por IA.
 │   ├── ai-cover.service.ts        Provedor da capa (COVER_PROVIDER) e fluxo de geração.
 │   ├── svg-cover.service.ts       Capa em SVG pelo Claude Sonnet.
@@ -82,7 +80,7 @@ src/
 ├── lib/
 │   ├── prisma.ts              Prisma Client único (adapter pg, maxWait 10 s).
 │   ├── http-config.ts         corsOrigins (FRONTEND_URL) e trustProxySetting (TRUST_PROXY).
-│   ├── network.ts             Timeout de 2 s por tentativa de conexão (Neon, OpenRouter, Resend).
+│   ├── network.ts             Timeout de 2 s por tentativa de conexão (Neon, Anthropic, Resend, Cloudinary).
 │   ├── jwt.ts                 signToken / verifyToken (claims sub e ver).
 │   ├── http-error.ts          HttpError(status, mensagem).
 │   ├── money.ts               moneySchema, formatMoney, calcProgress.
@@ -96,7 +94,6 @@ src/
 │   ├── ai-http-error.ts       AiError -> HttpError com mensagem amigável.
 │   ├── llm.ts                 chat() e isChatConfigured() conforme CHAT_PROVIDER.
 │   ├── anthropic.ts           Cliente do Claude (SDK oficial).
-│   ├── openrouter.ts          Cliente do OpenRouter (fetch).
 │   ├── cloudinary.ts          Cliente do Cloudinary (fetch): upload e destroy assinados (SHA-1), listagem (Admin API).
 │   ├── plain-text.ts          toPlainText (remove markdown).
 │   └── search-terms.ts        normalizeText e searchTerms (busca textual).
@@ -143,36 +140,31 @@ Outras pastas e arquivos: `prisma/` (schema, migrations e seed), `scripts/` (se�
 
 | Recurso | Provedor (variável) | Onde |
 |---------|---------------------|------|
-| Texto: chatbot, melhorar descrição, sugerir categoria | `CHAT_PROVIDER`: `anthropic` (Claude Haiku 5.5) ou `openrouter` | `lib/llm.ts` → `lib/anthropic.ts` ou `lib/openrouter.ts` |
-| Capa | `COVER_PROVIDER`: `anthropic-svg` (Claude Sonnet 5.5) ou `openrouter` (imagem) | `services/ai-cover.service.ts` |
-| Embeddings / busca semântica | Sempre OpenRouter | `lib/openrouter.ts` |
+| Texto: chatbot, melhorar descrição, sugerir categoria | `CHAT_PROVIDER`: `anthropic` (padrão; Claude Haiku 5.5) | `lib/llm.ts` → `lib/anthropic.ts` |
+| Capa | `COVER_PROVIDER`: `anthropic-svg` (padrão; Claude Sonnet 5.5) | `services/ai-cover.service.ts` → `services/svg-cover.service.ts` |
 
-- **Contrato comum** (`lib/ai-types.ts`): erros viram `AiError` com `kind` (`not_configured`, `invalid_key`, `no_credits`, `rate_limited`, `timeout`, `unavailable`, `rejected`, `bad_response`); `OpenRouterError` e `AnthropicError` estendem `AiError`. Os serviços tratam só `AiError` e respondem com mensagem amigável (`lib/ai-http-error.ts`). Nenhuma falha de IA derruba o servidor.
-- **Recursos ligados** (`GET /config/features`, `services/features.service.ts`): `semanticSearch` = `isSemanticSearchConfigured()` (chave do OpenRouter + `OPENROUTER_EMBEDDING_MODEL`); `aiCover` = `isCoverConfigured()` (`anthropic-svg`: chave da Anthropic, com modelo padrão; `openrouter`: chave + `OPENROUTER_IMAGE_MODEL`); `aiChat` e `aiWriting` = `isChatConfigured()`. O frontend esconde o que estiver desligado.
+Toda a IA usa a Anthropic. As duas variáveis continuam como ponto de escolha do provedor; um valor não suportado desliga o recurso correspondente e `warnAiConfig()` (`services/features.service.ts`) registra um aviso ao iniciar, sem derrubar o servidor.
+
+- **Contrato comum** (`lib/ai-types.ts`): erros viram `AiError` com `kind` (`not_configured`, `invalid_key`, `no_credits`, `rate_limited`, `timeout`, `unavailable`, `rejected`, `bad_response`); `AnthropicError` estende `AiError`. Os serviços tratam só `AiError` e respondem com mensagem amigável (`lib/ai-http-error.ts`). Nenhuma falha de IA derruba o servidor.
+- **Recursos ligados** (`GET /config/features`, `services/features.service.ts`): `aiCover` = `isCoverConfigured()` (provedor válido + chave da Anthropic; o modelo tem padrão); `aiChat` e `aiWriting` = `isChatConfigured()` (idem). O frontend esconde o que estiver desligado.
 - **Anthropic** (`lib/anthropic.ts`, SDK oficial `@anthropic-ai/sdk`): chat com `ANTHROPIC_CHAT_MODEL` (padrão `claude-haiku-5-5`), timeout de 30 s, `effort: "low"` e sem `temperature` (o Haiku 5.5 recusa valores fora do padrão); o raciocínio interno conta em `max_tokens`, por isso o limite é a cota da resposta + 2000 tokens. A retentativa do SDK fica desligada; `withRetry()` tenta de novo após 800 ms em limite de uso, indisponibilidade e rede (timeout não é repetido).
-- **OpenRouter** (`lib/openrouter.ts`, `fetch` em `https://openrouter.ai/api/v1`): `chat` (`/chat/completions`, 30 s), `embed` (`/embeddings`, 15 s) e `generateImage` (`/images`, 90 s). Nova tentativa após 800 ms para 429, 502, 503 e falha de rede; trata resposta 200 com objeto `error`.
 - **Capa SVG** (`services/svg-cover.service.ts`): prompt fixo pedindo um único `<svg>` com `viewBox="0 0 1200 675"`, ilustração plana e geométrica, sem texto, pessoas reais, imagens externas ou scripts. Usa `ANTHROPIC_COVER_MODEL` (padrão `claude-sonnet-5-5`) por streaming, `max_tokens` 32000, `effort: "medium"`, prazo de 150 s e `fallbacks: "default"`. O código é separado do texto em volta (`extractSvg`) e sanitizado (`lib/svg-sanitize.ts`): reconstruído só com `svg, g, path, rect, circle, ellipse, line, polyline, polygon, defs, linearGradient, radialGradient, stop, clipPath, mask` e atributos permitidos; DOCTYPE/entidades/CDATA, tags que não fecham, texto solto, SVG vazio ou acima de 200 KB são rejeitados. SVG inválido: uma nova tentativa e depois mensagem amigável.
-- **Capa por imagem** (`COVER_PROVIDER=openrouter`): prompt fixo em inglês (ilustração plana, 16:9, sem texto nem pessoas reais); o resultado é conferido pelos bytes antes de salvar.
 - **Fluxo da capa:** reserva no limite diário → geração → salva pelo `storage.service` → grava a URL na reserva → `{ url }`. Em falha, a reserva é desfeita (não consome o limite).
 - **Melhorar descrição** (`services/ai-description.service.ts`): prompt fixo que reescreve em português usando **somente** fatos, objetos, ações e números do título e da descrição originais, sem acrescentar atividades, benefícios, locais, públicos ou promessas; se faltar informação, só melhora clareza e gramática; mantém os verbos e as palavras principais quando corretos. O texto do usuário vai entre marcadores `<descricao>`; a resposta passa por `toPlainText()` e precisa ter de 10 a 5000 caracteres.
 - **Sugerir categoria** (`services/ai-category.service.ts`): as categorias vêm do banco (`id = nome`); o modelo responde só o número e o backend confere se o id existe.
-- **Chatbot** (`services/chat.service.ts`): histórico validado (só `user`/`assistant`, até 1000 caracteres por mensagem e 50 mensagens; o modelo recebe as 10 últimas). O prompt é montado por `buildSystemPrompt(getFeatures())` e só menciona recursos de IA ligados. Antes de responder, `findRelatedCampaigns` traz até 3 campanhas: busca semântica quando há embeddings; senão (ou se falhar), busca textual (`findRelatedCampaignsByText`: pergunta normalizada e sem palavras vazias por `lib/search-terms.ts`; cada termo vale 1 ponto se aparecer no título, na descrição ou na categoria; entram campanhas ativas que batem a maioria dos termos, ou metade incluindo o mais longo; comparação sem acentos com `translate()` + `lower()` no PostgreSQL, sem precisar da extensão `unaccent`). O contexto leva só campos públicos (título, categoria, resumo, meta, arrecadado, dias restantes e o caminho `/campaigns/<id>`). Resposta em texto puro (`toPlainText()`).
-- **Limites de uso** (`middlewares/rate-limit.ts`, em memória, por usuário ou IP): chat 15/min, busca inteligente 30/min, capa 3 a cada 10 min, escrita por IA 10 a cada 10 min, upload 20/hora. Diário de capas: 5 por usuário a cada 24 h, contadas na tabela `AiImageGeneration` (sobrevive a reinícios).
+- **Chatbot** (`services/chat.service.ts`): histórico validado (só `user`/`assistant`, até 1000 caracteres por mensagem e 50 mensagens; o modelo recebe as 10 últimas). O prompt é montado por `buildSystemPrompt(getFeatures())` e só menciona recursos de IA ligados. Antes de responder, `findRelatedCampaigns` traz até 3 campanhas pela busca textual (`findRelatedCampaignsByText`: pergunta normalizada e sem palavras vazias por `lib/search-terms.ts`; cada termo vale 1 ponto se aparecer no título, na descrição ou na categoria; entram campanhas ativas que batem a maioria dos termos, ou metade incluindo o mais longo; comparação sem acentos com `translate()` + `lower()` no PostgreSQL, sem precisar da extensão `unaccent`). O contexto leva só campos públicos (título, categoria, resumo, meta, arrecadado, dias restantes e o caminho `/campaigns/<id>`). Resposta em texto puro (`toPlainText()`).
+- **Limites de uso** (`middlewares/rate-limit.ts`, em memória, por usuário ou IP): chat 15/min, busca por texto (`/campaigns/search`) 30/min, capa 3 a cada 10 min, escrita por IA 10 a cada 10 min, upload 20/hora. Diário de capas: 5 por usuário a cada 24 h, contadas na tabela `AiImageGeneration` (sobrevive a reinícios).
 
-## 8. Banco, migrations e busca semântica
+## 8. Banco e migrations
 
 - **Migrations** (`prisma/migrations/`): `add_user_password`, `campaigns_donations`, `password_reset_tokens`, `ai_image_generations`, `pgvector_campaign_embedding`, `ai_cover` e `user_token_version`.
-- **pgvector:** a migration `pgvector_campaign_embedding` habilita a extensão, adiciona `Campaign.embedding vector(1024)` (no schema: `Unsupported("vector(1024)")`, lido e gravado com SQL bruto) e cria o índice **HNSW** `Campaign_embedding_hnsw_idx` com `vector_cosine_ops` (pode ser criado com a tabela vazia, ao contrário do IVFFlat).
-- **Atenção em novas migrations:** o Prisma não representa índices HNSW no schema e tenta apagá-lo. Sempre crie a migration com `npx prisma migrate dev --create-only --name <nome>`, **remova do SQL gerado a linha `DROP INDEX "Campaign_embedding_hnsw_idx";`** e só então aplique com `npx prisma migrate dev` (ou `migrate deploy`). Depois, rode `npx prisma generate`.
+- **Coluna `embedding` sem uso:** a migration `pgvector_campaign_embedding` habilitou a extensão `vector`, adicionou `Campaign.embedding vector(1024)` (no schema: `Unsupported("vector(1024)")?`, que o Prisma Client não lê) e criou o índice HNSW `Campaign_embedding_hnsw_idx`. A busca semântica com embeddings foi implementada e depois removida do escopo; a coluna `embedding` permanece sem uso: nenhum código lê ou grava nela. Não foi criada migration destrutiva; uma migration futura pode apagar a coluna, o índice e a extensão.
+- **Atenção em novas migrations (enquanto a coluna existir):** o Prisma não representa índices HNSW no schema e tenta apagá-lo. Sempre crie a migration com `npx prisma migrate dev --create-only --name <nome>`, **remova do SQL gerado a linha `DROP INDEX "Campaign_embedding_hnsw_idx";`** e só então aplique com `npx prisma migrate dev` (ou `migrate deploy`). Depois, rode `npx prisma generate`.
 - **Rede:** o Prisma CLI pode travar ou dar P1001 com o Neon em redes com latência alta; nesse caso, rode com `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000` e confira o resultado com `npx prisma migrate status`. Em tempo de execução, `lib/network.ts` aumenta o tempo por tentativa de conexão para 2 s e `lib/prisma.ts` aumenta o `maxWait` das transações para 10 s.
-- **Geração de embeddings:** ao criar uma campanha ou editar título, descrição ou categoria, `embedding.service.ts` gera em segundo plano o embedding de "título + descrição + categoria" (falha só gera log). Para as que ficaram sem: `npx tsx scripts/backfill-embeddings.ts`.
-- **Busca:** `GET /campaigns/search` ordena pela distância de cosseno (`<=>`) e só devolve resultados com similaridade ≥ 0,45 (`MIN_SIMILARITY`, calibrado com o `baai/bge-m3`). Sem embeddings ou com falha da IA, usa a busca textual da listagem e avisa em `notice`.
-- **Estado atual:** busca semântica desligada (OpenRouter sem saldo). O código está pronto; ao configurar a chave e o modelo, rode o backfill.
-- **Trocar o modelo de embeddings** exige migration com a nova dimensão, ajustar `EMBEDDING_DIMENSIONS`, backfill com `--all` e recalibrar `MIN_SIMILARITY`.
 
 ## 9. Dados de demonstração
 
-`npm run seed:demo` (`scripts/seed-demo.ts`) cria 2 usuários e 5 campanhas fictícias (títulos começam com `[Demo]`), com prazos no futuro, nas categorias do seed, e doações de exemplo (sempre do outro usuário). É idempotente: rodar de novo atualiza os mesmos registros e empurra os prazos para o futuro. Se os embeddings estiverem configurados, gera os embeddings; senão, só avisa. Requer as categorias (`npx prisma db seed`).
+`npm run seed:demo` (`scripts/seed-demo.ts`) cria 2 usuários e 5 campanhas fictícias (títulos começam com `[Demo]`), com prazos no futuro, nas categorias do seed, e doações de exemplo (sempre do outro usuário). É idempotente: rodar de novo atualiza os mesmos registros e empurra os prazos para o futuro. Requer as categorias (`npx prisma db seed`).
 
 | E-mail | Senha |
 |--------|-------|

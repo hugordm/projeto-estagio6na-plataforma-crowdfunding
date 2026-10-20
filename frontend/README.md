@@ -51,7 +51,7 @@ O alias `@/` aponta para `src/` (ex.: `import { getCampaign } from "@/lib/api"`)
 | `layout.tsx` | todas | Layout raiz: fontes, `AuthProvider`, `FeaturesProvider`, `NavigationTracker`, `Navbar`, conteúdo e `ChatWidget`. Metadados: título padrão "Crowdfunding", modelo `%s \| Crowdfunding` e descrição. |
 | `icon.svg`, `apple-icon.png` | — | Ícone do site (quadrado verde `#009966` com coração branco; o PNG 180x180 é gerado a partir do SVG, sem cantos arredondados, porque o iOS aplica a própria máscara). O Next gera as tags `<link rel="icon">` e `apple-touch-icon`. |
 | `globals.css` | — | Tailwind e classes reaproveitadas (`.input`, `.label`, `.card`, `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-ai`, `.btn-ai-secondary`); regra que sobe o botão do chatbot quando há barra de ações fixa. |
-| `page.tsx` | `/` | Lista de campanhas com busca por texto, filtro por categoria, paginação e "Busca inteligente" (só quando ligada). |
+| `page.tsx` | `/` | Lista de campanhas com busca por texto (título e descrição), filtro por categoria e paginação. |
 | `campaigns/[id]/page.tsx` | `/campaigns/:id` | Detalhe: capa, categoria, situação, selo de IA, descrição, progresso, prazo, doação, doadores, "Editar" (dono) e "Compartilhar". |
 | `campaigns/[id]/layout.tsx` | `/campaigns/:id` | Layout de servidor com `generateMetadata`: busca título e descrição na API para a aba e para quem recebe o link (título `absolute`, "<título> \| Crowdfunding", para o modelo do layout raiz não repetir o sufixo). |
 | `campaigns/new/page.tsx` | `/campaigns/new` | Criação (exige login) com o `CampaignForm`. |
@@ -68,7 +68,7 @@ O alias `@/` aponta para `src/` (ex.: `import { getCampaign } from "@/lib/api"`)
 | Arquivo | Descrição |
 |---------|-----------|
 | `AuthContext.tsx` | `AuthProvider` e `useAuth()`: usuário, token, `ready` (sessão já lida), `login`, `register` e `logout`. Restaura a sessão do `localStorage` e encerra a sessão quando a API recusa o token (evento disparado por `lib/api.ts`). |
-| `FeaturesContext.tsx` | `FeaturesProvider` e `useFeatures()`: consulta `GET /config/features` uma vez ao abrir o site. Começa com tudo desligado (também em caso de erro) e controla a exibição da busca inteligente, da aba "Gerar com IA", dos botões de escrita por IA e do chatbot. |
+| `FeaturesContext.tsx` | `FeaturesProvider` e `useFeatures()`: consulta `GET /config/features` uma vez ao abrir o site. Começa com tudo desligado (também em caso de erro) e controla a exibição da aba "Gerar com IA", dos botões de escrita por IA e do chatbot. |
 
 ### 3.3 Componentes (`src/components/`)
 
@@ -96,7 +96,7 @@ Os botões de IA mostram, só quando desabilitados, uma frase curta com o que fa
 | Componente | Descrição |
 |------------|-----------|
 | `CampaignCard.tsx` | Card da listagem (imagem 16:9, categoria, situação, título, progresso, valores e prazo); pode ser link ou só visual. |
-| `CampaignFilters.tsx` | Busca por texto, filtro de categoria e opção "Busca inteligente" (só quando ligada). |
+| `CampaignFilters.tsx` | Campo de busca por texto e filtro de categoria. |
 | `CoverImage.tsx` | Capa sempre em 16:9 e inteira: imagem com `object-contain` sobre um fundo com a mesma imagem ampliada e desfocada; `<img>` comum (aceita qualquer domínio); se falhar ao carregar, mostra "Sem imagem". Selo de IA opcional. |
 | `ProgressBar.tsx` | Barra de progresso (pode passar de 100%). |
 | `StatusBadge.tsx` | Etiqueta "Ativa" / "Encerrada". |
