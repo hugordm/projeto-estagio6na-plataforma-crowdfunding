@@ -48,11 +48,12 @@ O alias `@/` aponta para `src/` (ex.: `import { getCampaign } from "@/lib/api"`)
 
 | Arquivo | Rota | Descrição |
 |---------|------|-----------|
-| `layout.tsx` | todas | Layout raiz: fontes, `AuthProvider`, `FeaturesProvider`, `NavigationTracker`, `Navbar`, conteúdo e `ChatWidget`. Metadados padrão do site. |
+| `layout.tsx` | todas | Layout raiz: fontes, `AuthProvider`, `FeaturesProvider`, `NavigationTracker`, `Navbar`, conteúdo e `ChatWidget`. Metadados: título padrão "Crowdfunding", modelo `%s \| Crowdfunding` e descrição. |
+| `icon.svg`, `apple-icon.png` | — | Ícone do site (quadrado verde `#009966` com coração branco; o PNG 180x180 é gerado a partir do SVG, sem cantos arredondados, porque o iOS aplica a própria máscara). O Next gera as tags `<link rel="icon">` e `apple-touch-icon`. |
 | `globals.css` | — | Tailwind e classes reaproveitadas (`.input`, `.label`, `.card`, `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-ai`, `.btn-ai-secondary`); regra que sobe o botão do chatbot quando há barra de ações fixa. |
 | `page.tsx` | `/` | Lista de campanhas com busca por texto, filtro por categoria, paginação e "Busca inteligente" (só quando ligada). |
 | `campaigns/[id]/page.tsx` | `/campaigns/:id` | Detalhe: capa, categoria, situação, selo de IA, descrição, progresso, prazo, doação, doadores, "Editar" (dono) e "Compartilhar". |
-| `campaigns/[id]/layout.tsx` | `/campaigns/:id` | Layout de servidor com `generateMetadata`: busca título e descrição na API para a aba e para quem recebe o link. |
+| `campaigns/[id]/layout.tsx` | `/campaigns/:id` | Layout de servidor com `generateMetadata`: busca título e descrição na API para a aba e para quem recebe o link (título `absolute`, "<título> \| Crowdfunding", para o modelo do layout raiz não repetir o sufixo). |
 | `campaigns/new/page.tsx` | `/campaigns/new` | Criação (exige login) com o `CampaignForm`. |
 | `campaigns/[id]/edit/page.tsx` | `/campaigns/:id/edit` | Edição (exige login; só o dono vê o formulário), encerrar e excluir. |
 | `login/page.tsx` | `/login` | Entrar; aceita `?email=` (pré-preenche), `?next=` (volta para a página de origem, só caminhos internos) e `?reset=1` (aviso de senha redefinida). |
@@ -96,7 +97,7 @@ Os botões de IA mostram, só quando desabilitados, uma frase curta com o que fa
 |------------|-----------|
 | `CampaignCard.tsx` | Card da listagem (imagem 16:9, categoria, situação, título, progresso, valores e prazo); pode ser link ou só visual. |
 | `CampaignFilters.tsx` | Busca por texto, filtro de categoria e opção "Busca inteligente" (só quando ligada). |
-| `CampaignImage.tsx` | Imagem da campanha com `<img>` (aceita qualquer domínio) ou placeholder "Sem imagem". |
+| `CoverImage.tsx` | Capa sempre em 16:9 e inteira: imagem com `object-contain` sobre um fundo com a mesma imagem ampliada e desfocada; `<img>` comum (aceita qualquer domínio); se falhar ao carregar, mostra "Sem imagem". Selo de IA opcional. |
 | `ProgressBar.tsx` | Barra de progresso (pode passar de 100%). |
 | `StatusBadge.tsx` | Etiqueta "Ativa" / "Encerrada". |
 | `AiBadge.tsx` | Selo "Capa gerada por IA". |

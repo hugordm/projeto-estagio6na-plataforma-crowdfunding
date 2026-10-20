@@ -22,7 +22,8 @@ export async function generateMetadata({ params }: LayoutProps<"/campaigns/[id]"
     const campaign = (await response.json()) as { title: string; description: string };
     const description = campaign.description.replace(/\s+/g, " ").trim().slice(0, DESCRIPTION_LENGTH);
     return {
-      title: `${campaign.title} | Crowdfunding`,
+      // absolute: já leva o sufixo; sem isso o template do layout raiz o repetiria.
+      title: { absolute: `${campaign.title} | Crowdfunding` },
       description,
       openGraph: { title: campaign.title, description },
     };

@@ -17,9 +17,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Título padrão e modelo das páginas filhas ("Minha conta" -> "Minha conta | Crowdfunding").
+// O ícone vem dos arquivos app/icon.svg e app/apple-icon.png (convenção do App Router).
 export const metadata: Metadata = {
-  title: "Plataforma de Crowdfunding",
-  description: "Crie campanhas e apoie projetos com doações.",
+  title: { default: "Crowdfunding", template: "%s | Crowdfunding" },
+  description: "Crie campanhas de arrecadação e apoie projetos com doações.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
