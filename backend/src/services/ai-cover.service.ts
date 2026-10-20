@@ -43,13 +43,13 @@ async function generateImageCover(input: CoverInput): Promise<string> {
   const image = await generateImage(buildCoverPrompt(input), { aspectRatio: '16:9' });
   const type = detectImageType(image.content);
   if (!type) throw new OpenRouterError('bad_response', `Imagem em formato inesperado (${image.mediaType})`);
-  return saveImage(image.content, type.extension);
+  return saveImage(image.content, type);
 }
 
 // SVG pela Anthropic: o svg-cover.service já devolve o código sanitizado.
 async function generateVectorCover(input: CoverInput): Promise<string> {
   const svg = await generateSvgCover(input);
-  return saveImage(Buffer.from(svg, 'utf8'), GENERATED_SVG.extension);
+  return saveImage(Buffer.from(svg, 'utf8'), GENERATED_SVG);
 }
 
 // Mensagem para o usuário conforme o tipo de falha da IA (detalhes técnicos só no log).

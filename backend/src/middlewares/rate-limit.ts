@@ -42,6 +42,18 @@ export const forgotPasswordEmailLimiter = rateLimit({
   message: limitMessage('Muitos pedidos para este e-mail. Aguarde e tente novamente mais tarde.'),
 });
 
+// Documentação (/docs, /docs.json e arquivos da UI): 20 tentativas falhas (401/404...) a cada 15 minutos
+// por IP. Só as falhas contam, porque cada abertura da Swagger UI baixa vários arquivos.
+export const docsLimiter = rateLimit({
+  windowMs: 15 * MINUTE,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => `ip:${clientIp(req)}`,
+  message: limitMessage('Muitas tentativas de acesso à documentação. Aguarde alguns minutos e tente novamente.'),
+});
+
 // Chave por usuário logado (rotas com requireAuth); sem login, cai para o IP.
 function userOrIp(req: Request): string {
   return req.userId !== undefined ? `user:${req.userId}` : `ip:${clientIp(req)}`;

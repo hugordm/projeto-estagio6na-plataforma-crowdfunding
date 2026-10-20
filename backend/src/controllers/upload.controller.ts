@@ -11,6 +11,6 @@ export async function uploadCampaignImage(req: Request, res: Response) {
   const type = detectImageType(req.file.buffer);
   if (!type) throw new HttpError(400, 'Formato não suportado. Envie uma imagem JPEG, PNG ou WebP.');
 
-  const url = await saveImage(req.file.buffer, type.extension);
+  const url = await saveImage(req.file.buffer, type);
   res.status(201).json({ url });
 }

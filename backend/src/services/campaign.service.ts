@@ -5,8 +5,8 @@ import { calcProgress, formatMoney } from '../lib/money';
 import { buildMeta, type Pagination } from '../lib/pagination';
 import { scheduleCampaignEmbedding } from './embedding.service';
 import { isAiGeneratedImage } from './ai-usage.service';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { deleteImage } from './storage.service';
+import { diffCalendarDays, isDeadlineOver } from '../lib/dates';
 
 const campaignInclude = {
   owner: { select: { id: true, name: true } },
@@ -46,12 +46,15 @@ function serializeCampaign(campaign: CampaignWithRelations, stats: DonationStats
     raisedAmount: formatMoney(raised),
     donorsCount: stats?.donorsCount ?? 0,
     progress: calcProgress(raised, campaign.goalAmount),
+    daysLeft: daysLeft(campaign.deadline),
+    expired: isDeadlineOver(campaign.deadline),
   };
 }
 
-// Dias (arredondados para cima) até o prazo, nunca negativo. Também usado no contexto do chatbot.
+// Dias de calendário até o prazo em America/Sao_Paulo (prazo hoje = 0, "Último dia"), nunca negativo.
+// Prazo passado também dá 0: quem distingue é expired (isDeadlineOver). Usado também no chatbot.
 export function daysLeft(deadline: Date): number {
-  return Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / DAY_MS));
+  return Math.max(0, diffCalendarDays(deadline));
 }
 
 async function ensureCategoryExists(categoryId: number) {
@@ -116,7 +119,7 @@ export async function getCampaignsByIds(ids: number[]) {
   });
 }
 
-// Campanhas criadas pelo usuário (todas as situações), mais recentes primeiro, com daysLeft.
+// Campanhas criadas pelo usuário (todas as situações), mais recentes primeiro.
 export async function listOwnCampaigns(ownerId: number, { page, limit }: Pagination) {
   const where = { ownerId };
   const [total, campaigns] = await prisma.$transaction([
@@ -132,7 +135,7 @@ export async function listOwnCampaigns(ownerId: number, { page, limit }: Paginat
 
   const stats = await getDonationStats(campaigns.map((c) => c.id));
   return {
-    data: campaigns.map((c) => ({ ...serializeCampaign(c, stats.get(c.id)), daysLeft: daysLeft(c.deadline) })),
+    data: campaigns.map((c) => serializeCampaign(c, stats.get(c.id))),
     meta: buildMeta({ page, limit }, total),
   };
 }
@@ -142,7 +145,7 @@ export async function getCampaign(id: number) {
   if (!campaign) throw new HttpError(404, 'Campanha não encontrada');
 
   const stats = await getDonationStats([id]);
-  return { ...serializeCampaign(campaign, stats.get(id)), daysLeft: daysLeft(campaign.deadline) };
+  return serializeCampaign(campaign, stats.get(id));
 }
 
 export type CreateCampaignData = {
@@ -170,12 +173,13 @@ export type UpdateCampaignData = Partial<Omit<CreateCampaignData, 'imageUrl'>> &
 };
 
 export async function updateCampaign(id: number, userId: number, data: UpdateCampaignData) {
-  await findOwnedCampaign(id, userId);
+  const current = await findOwnedCampaign(id, userId);
   if (data.categoryId !== undefined) await ensureCategoryExists(data.categoryId);
 
   // Se a imagem mudou (ou foi removida), recalcula a etiqueta "Capa gerada por IA".
   const imageGeneratedByAi = data.imageUrl !== undefined ? await isAiGeneratedImage(data.imageUrl) : undefined;
   await prisma.campaign.update({ where: { id }, data: { ...data, imageGeneratedByAi } });
+  if (data.imageUrl !== undefined && data.imageUrl !== current.imageUrl) await discardImage(current.imageUrl);
   // Só refaz o embedding se mudou algo do texto que ele representa.
   if (data.title !== undefined || data.description !== undefined || data.categoryId !== undefined) {
     scheduleCampaignEmbedding(id);
@@ -186,7 +190,7 @@ export async function updateCampaign(id: number, userId: number, data: UpdateCam
 // Campanha com doações não pode ser excluída (o histórico precisa ser mantido): o dono deve encerrá-la.
 // O banco reforça a regra com ON DELETE RESTRICT na FK de Donation.
 export async function deleteCampaign(id: number, userId: number) {
-  await findOwnedCampaign(id, userId);
+  const campaign = await findOwnedCampaign(id, userId);
 
   const donationsCount = await prisma.donation.count({ where: { campaignId: id } });
   if (donationsCount > 0) {
@@ -197,4 +201,13 @@ export async function deleteCampaign(id: number, userId: number) {
   }
 
   await prisma.campaign.delete({ where: { id } });
+  await discardImage(campaign.imageUrl);
+}
+
+// Apaga do storage a imagem que a campanha deixou de usar (troca, remoção ou exclusão), se for nossa
+// e nenhuma outra campanha usar a mesma URL. Falha ao apagar só vai para o log (deleteImage).
+async function discardImage(url: string | null) {
+  if (!url) return;
+  if ((await prisma.campaign.count({ where: { imageUrl: url } })) > 0) return;
+  await deleteImage(url);
 }

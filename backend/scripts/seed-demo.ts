@@ -6,6 +6,7 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../src/lib/prisma';
+import { addCalendarDays, endOfDeadlineDay, todayInSaoPaulo } from '../src/lib/dates';
 import { isAiConfigured } from '../src/lib/openrouter';
 import { BCRYPT_COST } from '../src/services/auth.service';
 import { updateCampaignEmbedding } from '../src/services/embedding.service';
@@ -85,11 +86,9 @@ const CAMPAIGNS: DemoCampaign[] = [
 
 const demoEmails = USERS.map((u) => u.email);
 
+// Prazo = hoje + N dias em America/Sao_Paulo, gravado como o fim desse dia (mesma regra da API).
 function daysFromNow(days: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  date.setHours(23, 59, 59, 0);
-  return date;
+  return endOfDeadlineDay(addCalendarDays(todayInSaoPaulo(), days));
 }
 
 async function seed() {

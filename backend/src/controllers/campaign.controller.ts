@@ -4,6 +4,7 @@ import { getUserId } from '../middlewares/auth';
 import { moneySchema } from '../lib/money';
 import { idParamSchema, paginationSchema } from '../lib/pagination';
 import { isSvgUrl } from '../lib/image-type';
+import { calendarDateInSaoPaulo, endOfDeadlineDay, isCalendarDate, todayInSaoPaulo } from '../lib/dates';
 import { isOwnUploadUrl } from '../services/storage.service';
 import * as campaignService from '../services/campaign.service';
 import * as searchService from '../services/search.service';
@@ -13,9 +14,23 @@ export const listQuerySchema = paginationSchema.extend({
   q: z.string().trim().optional(),
 });
 
-const deadlineSchema = z.coerce
-  .date({ error: 'Prazo (deadline) deve ser uma data válida' })
-  .refine((date) => date > new Date(), 'Prazo (deadline) deve ser uma data futura');
+// Prazo = dia de calendário em America/Sao_Paulo. Aceita "AAAA-MM-DD" (preferido) ou data e hora ISO 8601
+// (vale o dia desse instante em São Paulo). É gravado como o fim desse dia (23:59:59.999 em São Paulo).
+// Hoje é aceito (vira "Último dia").
+const deadlineSchema = z
+  .string({ error: 'Prazo (deadline) deve ser uma data válida' })
+  .trim()
+  .refine((value) => deadlineDay(value) !== null, 'Prazo (deadline) deve ser uma data válida')
+  .transform((value) => deadlineDay(value)!)
+  .refine((day) => day >= todayInSaoPaulo(), 'Prazo (deadline) deve ser hoje ou uma data futura')
+  .transform((day) => endOfDeadlineDay(day));
+
+// "AAAA-MM-DD" (precisa existir no calendário) ou data e hora ISO -> dia em São Paulo; null se inválido.
+function deadlineDay(value: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return isCalendarDate(value) ? value : null;
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? null : calendarDateInSaoPaulo(new Date(time));
+}
 
 export const campaignSchema = z.object({
   title: z.string({ error: 'Título é obrigatório' }).trim().min(3, 'Título deve ter pelo menos 3 caracteres').max(120, 'Título deve ter no máximo 120 caracteres'),

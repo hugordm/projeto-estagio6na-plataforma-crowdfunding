@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { HttpError } from '../lib/http-error';
 import { formatMoney } from '../lib/money';
 import { buildMeta, type Pagination } from '../lib/pagination';
+import { isDeadlineOver } from '../lib/dates';
 
 // Doação simulada: não há gateway de pagamento, o registro é criado direto no banco.
 export async function createDonation(
@@ -13,7 +14,8 @@ export async function createDonation(
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new HttpError(404, 'Campanha não encontrada');
   if (campaign.ownerId === donorId) throw new HttpError(403, 'Você não pode doar para a própria campanha');
-  if (campaign.status !== 'ACTIVE' || campaign.deadline <= new Date()) {
+  // Aceita até o fim do dia do prazo em São Paulo (23:59:59), qualquer que seja o fuso do servidor.
+  if (campaign.status !== 'ACTIVE' || isDeadlineOver(campaign.deadline)) {
     throw new HttpError(400, 'Esta campanha não está mais aceitando doações');
   }
 

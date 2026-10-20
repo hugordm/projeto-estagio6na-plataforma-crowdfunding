@@ -58,7 +58,7 @@ export const schemas: Record<string, JsonSchema> = {
   },
   Campaign: {
     type: 'object',
-    required: ['id', 'title', 'description', 'goalAmount', 'raisedAmount', 'progress', 'donorsCount', 'deadline', 'status', 'category', 'owner'],
+    required: ['id', 'title', 'description', 'goalAmount', 'raisedAmount', 'progress', 'donorsCount', 'deadline', 'daysLeft', 'expired', 'status', 'category', 'owner'],
     properties: {
       id: { type: 'integer', example: 12 },
       title: { type: 'string', example: 'Biblioteca comunitária do bairro' },
@@ -69,7 +69,13 @@ export const schemas: Record<string, JsonSchema> = {
       donorsCount: { type: 'integer', description: 'Doadores distintos.', example: 4 },
       imageUrl: { type: 'string', format: 'uri', nullable: true, example: 'http://localhost:3001/uploads/9b2f6c1e-1d2a-4c55-9e1f-0a7b3c2d4e5f.png' },
       imageGeneratedByAi: { type: 'boolean', description: 'true quando a capa foi gerada pela IA deste servidor.', example: false },
-      deadline: dateTime('2026-12-19T23:59:59.000Z'),
+      deadline: { ...dateTime('2026-12-20T02:59:59.999Z'), description: 'Fim do dia do prazo em America/Sao_Paulo (23:59:59.999 de 19/12/2026 em Brasília). Doações são aceitas até este instante.' },
+      daysLeft: {
+        type: 'integer',
+        description: 'Dias de calendário de hoje até o prazo, em America/Sao_Paulo (prazo hoje = 0, "Último dia"). Nunca negativo: prazo passado também é 0, com expired = true.',
+        example: 30,
+      },
+      expired: { type: 'boolean', description: 'true quando o dia do prazo já terminou em America/Sao_Paulo (não aceita mais doações).', example: false },
       status: { type: 'string', enum: ['ACTIVE', 'FINISHED'], example: 'ACTIVE' },
       ownerId: { type: 'integer', example: 7 },
       categoryId: { type: 'integer', example: 2 },
@@ -79,12 +85,8 @@ export const schemas: Record<string, JsonSchema> = {
       updatedAt: dateTime('2026-10-19T12:00:00.000Z'),
     },
   },
-  CampaignDetail: {
-    allOf: [
-      { $ref: '#/components/schemas/Campaign' },
-      { type: 'object', properties: { daysLeft: { type: 'integer', description: 'Dias até o prazo (nunca negativo).', example: 61 } } },
-    ],
-  },
+  // Mesmo formato de Campaign (daysLeft e expired vêm em todas as respostas de campanha).
+  CampaignDetail: { allOf: [{ $ref: '#/components/schemas/Campaign' }] },
   CampaignPage: {
     type: 'object',
     required: ['data', 'meta'],

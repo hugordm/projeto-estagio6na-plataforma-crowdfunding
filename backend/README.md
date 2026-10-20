@@ -33,7 +33,7 @@ As variáveis de ambiente estão descritas na seção 9 do [README da raiz](../R
 | `npm run lint` | ESLint (regras recomendadas do ESLint e do `typescript-eslint`, sem checagem por tipos). |
 | `npm run check:ai` | Diagnóstico da IA: provedores ativos, variáveis definidas (sem valores), recursos ligados, teste de chat e de embeddings. `-- --image` e `-- --cover` testam a geração de capa (com custo). |
 | `npm run seed:demo` / `npm run seed:demo:clean` | Cria / apaga os dados de demonstração (seção 9). |
-| `npm run cleanup:uploads` | Lista arquivos órfãos em `uploads/`; com `-- --apply` apaga (seção 6). |
+| `npm run cleanup:uploads` | Lista imagens órfãs do provedor ativo; com `-- --apply` apaga (Cloudinary: `-- --apply --confirm-cloudinary`) (seção 6). |
 | `npx tsx scripts/backfill-embeddings.ts [--all]` | Gera os embeddings que faltam (ou refaz todos, com `--all`). |
 
 ## 3. Estrutura de `src/`
@@ -54,17 +54,17 @@ src/
 │   ├── category.routes.ts     /categories.
 │   ├── chat.routes.ts         /chat (optionalAuth + chatLimiter).
 │   ├── config.routes.ts       /config/features.
-│   ├── docs.routes.ts         /docs (Swagger UI) e /docs.json; DOCS_ENABLED=false desliga.
+│   ├── docs.routes.ts         /docs (Swagger UI) e /docs.json; DOCS_ENABLED=false desliga; HTTP Basic opcional.
 │   ├── me.routes.ts           /me/campaigns e /me/donations (requireAuth em todas).
 │   └── upload.routes.ts       /uploads/campaign-image (requireAuth, uploadLimiter, multer).
 ├── controllers/               Leem req, validam com zod (schemas exportados, usados também pela documentação) e chamam o service.
 ├── services/                  Regras de negócio, Prisma e serviços externos.
 │   ├── auth.service.ts            Cadastro e login (bcrypt custo 10, JWT com tokenVersion).
 │   ├── password-reset.service.ts  Token de recuperação e envio do e-mail.
-│   ├── campaign.service.ts        CRUD, totais de doações, progresso, daysLeft.
+│   ├── campaign.service.ts        CRUD, totais de doações, progresso, daysLeft e expired.
 │   ├── donation.service.ts        Regras de doação e listas de doações.
 │   ├── category.service.ts        Categorias.
-│   ├── storage.service.ts         Interface Storage e gravação em disco (uploads/).
+│   ├── storage.service.ts         Interface Storage: disco (uploads/) ou Cloudinary, por STORAGE_PROVIDER.
 │   ├── embedding.service.ts       Embedding da campanha (geração em segundo plano).
 │   ├── search.service.ts          Busca semântica e busca textual para o chat.
 │   ├── ai-usage.service.ts        Limite diário de capas por IA.
@@ -86,6 +86,7 @@ src/
 │   ├── jwt.ts                 signToken / verifyToken (claims sub e ver).
 │   ├── http-error.ts          HttpError(status, mensagem).
 │   ├── money.ts               moneySchema, formatMoney, calcProgress.
+│   ├── dates.ts               todayInSaoPaulo, diffCalendarDays, endOfDeadlineDay, isDeadlineOver (fuso America/Sao_Paulo).
 │   ├── pagination.ts          paginationSchema, buildMeta, idParamSchema.
 │   ├── image-type.ts          detectImageType (bytes), isSvgUrl.
 │   ├── svg-sanitize.ts        sanitizeSvg, extractSvg.
@@ -96,6 +97,7 @@ src/
 │   ├── llm.ts                 chat() e isChatConfigured() conforme CHAT_PROVIDER.
 │   ├── anthropic.ts           Cliente do Claude (SDK oficial).
 │   ├── openrouter.ts          Cliente do OpenRouter (fetch).
+│   ├── cloudinary.ts          Cliente do Cloudinary (fetch): upload e destroy assinados (SHA-1), listagem (Admin API).
 │   ├── plain-text.ts          toPlainText (remove markdown).
 │   └── search-terms.ts        normalizeText e searchTerms (busca textual).
 └── types/express.d.ts         req.userId.
@@ -110,10 +112,11 @@ Outras pastas e arquivos: `prisma/` (schema, migrations e seed), `scripts/` (se�
 - **Erros:** sempre `{ "error": "mensagem em português" }`; validação inválida (zod) → 400; JSON malformado → 400; rota inexistente → 404; erro não tratado → 500 com mensagem genérica (detalhe só no log).
 - **Valores monetários:** `Decimal(12,2)` no banco e `Prisma.Decimal` no código. Entrada: número ou string com até 2 casas, maior que zero e até 9.999.999.999,99. Saída: sempre string com 2 casas (ex.: `"150.50"`). `progress` é um número percentual com 2 casas e pode passar de 100.
 - **Valor arrecadado:** não é coluna; é a soma das doações calculada a cada consulta. `donorsCount` conta doadores distintos.
+- **Prazo:** dia de calendário em America/Sao_Paulo (`lib/dates.ts`), qualquer que seja o fuso do servidor. Entrada `"AAAA-MM-DD"` (ou data e hora ISO, que vale o dia daquele instante em Brasília), hoje ou depois; gravado como o fim do dia (23:59:59.999 em Brasília). Toda campanha devolvida tem `daysLeft` (dias de calendário até o prazo: hoje = 0, nunca negativo) e `expired` (o dia do prazo já terminou). Doações são aceitas até o fim do dia do prazo.
 - **Paginação:** `page` (mín. 1) e `limit` (1 a 50, padrão 10); resposta `{ data, meta: { page, limit, total, totalPages } }`.
 - **CORS:** só as origens de `FRONTEND_URL` (separadas por vírgula; padrão `http://localhost:3000`) podem chamar a API pelo navegador. curl, scripts e a Swagger UI em `/docs` (mesma origem) não dependem disso.
 - **Proxy:** `TRUST_PROXY` (vazio/`false` por padrão; `1` atrás de um proxy como o do Render) define quando confiar no `X-Forwarded-For`, para o rate limit usar o IP real.
-- **Documentação:** Swagger UI em `/docs` e OpenAPI em `/docs.json` (desligue com `DOCS_ENABLED=false`). Ao criar ou mudar uma rota, atualize `src/docs/openapi.ts` e rode `npm run docs:check`.
+- **Documentação:** Swagger UI em `/docs` e OpenAPI em `/docs.json` (desligue com `DOCS_ENABLED=false`; com `DOCS_USER` e `DOCS_PASSWORD`, exige HTTP Basic, com rate limit de 20 falhas/15 min por IP). Ao criar ou mudar uma rota, atualize `src/docs/openapi.ts` e rode `npm run docs:check`.
 
 ## 5. Recuperação de senha
 
@@ -125,11 +128,16 @@ Outras pastas e arquivos: `prisma/` (schema, migrations e seed), `scripts/` (se�
 
 ## 6. Upload de imagens
 
-- `services/storage.service.ts` define a interface `Storage` (`save`, `getPublicUrl`). A implementação atual (`DiskStorage`) grava em `uploads/` com nome aleatório (UUID); o Express serve a pasta em `/uploads` com `X-Content-Type-Options: nosniff`. Para produção (disco efêmero ou vários servidores), basta outra implementação com S3, Cloudinary ou similar.
+- `services/storage.service.ts` define a interface `Storage` (`save`, `owns`, `remove`) com duas implementações, escolhidas por `STORAGE_PROVIDER`:
+  - `local` (padrão, `DiskStorage`): grava em `uploads/` com nome aleatório (UUID); o Express serve a pasta em `/uploads` com `X-Content-Type-Options: nosniff` (e CSP restritiva no SVG).
+  - `cloudinary` (`CloudinaryStorage` + `lib/cloudinary.ts`): upload assinado para `CLOUDINARY_FOLDER/<uuid>` (padrão `crowdfunding/campaigns`), sem sobrescrever; a `imageUrl` é a `secure_url` (`https://res.cloudinary.com/...`). A capa SVG da IA (já sanitizada) vai como `resource_type: image`, e a URL salva recebe `fl_sanitize`. Falha do provedor → 502 com mensagem genérica; sem credenciais → 503 (e aviso ao iniciar). Chave e segredo nunca vão para o log.
+  - O resto do código usa só `saveImage`, `deleteImage` e `isOwnUploadUrl`. As duas implementações reconhecem os próprios arquivos sempre, então URLs `/uploads/...` antigas continuam válidas (e apagáveis) com o Cloudinary ativo, e vice-versa (se as credenciais continuarem configuradas).
+- **Testes sem conta real:** `CLOUDINARY_UPLOAD_PREFIX` (mesmo nome usado pelo SDK oficial; padrão `https://api.cloudinary.com`) troca o endereço da API, por exemplo para um servidor falso local. Não defina em produção.
+- **Troca e remoção:** ao trocar a capa, removê-la (`imageUrl: null`) ou excluir a campanha, o arquivo antigo é apagado no provedor a que a URL pertence, se nenhuma outra campanha usar a mesma URL. Falha ao apagar é registrada no log e a requisição segue normalmente.
 - `middlewares/upload.ts` usa o `multer` em memória (5 MB, um arquivo, campo `image`). O tipo é decidido pelos primeiros bytes (`lib/image-type.ts`): só JPEG, PNG e WebP; SVG enviado por usuário é recusado.
-- `imageUrl` da campanha aceita a URL devolvida pelo upload ou uma URL `http(s)` externa, exceto `.svg`: SVG só é aceito se o arquivo for deste servidor (capa gerada e sanitizada). Na edição, `imageUrl: null` remove a imagem.
+- `imageUrl` da campanha aceita a URL devolvida pelo upload ou uma URL `http(s)` externa, exceto `.svg`: SVG só é aceito se o arquivo for da plataforma (`/uploads` deste servidor ou a conta e a pasta do Cloudinary configuradas), ou seja, a capa gerada e sanitizada. Na edição, `imageUrl: null` remove a imagem.
 - `Campaign.imageGeneratedByAi` é calculado pelo backend: `true` só se a `imageUrl` estiver registrada em `AiImageGeneration`.
-- **Arquivos órfãos:** `npm run cleanup:uploads` lista arquivos com mais de 24 h que nenhuma campanha (`imageUrl`) nem geração de IA (`AiImageGeneration.url`) referencia; só apaga com `-- --apply`. O `.gitkeep` nunca é apagado. Não roda sozinho (pode ser agendado).
+- **Arquivos órfãos:** `npm run cleanup:uploads` lista, no provedor ativo, arquivos com mais de 24 h que nenhuma campanha (`imageUrl`) nem geração de IA (`AiImageGeneration.url`) referencia. Local: só apaga com `-- --apply` (o `.gitkeep` nunca é apagado). Cloudinary: lista a pasta pela Admin API e só apaga com `-- --apply --confirm-cloudinary`. Não roda sozinho (pode ser agendado).
 
 ## 7. IA
 

@@ -55,7 +55,7 @@ Content-Type: application/json
 GET {{baseUrl}}/categories
 
 ### 4. Criar campanha (autenticado)
-# curl -s -X POST $BASE/campaigns -H "Authorization: Bearer $TOKEN_ANA" -H 'Content-Type: application/json' -d '{"title":"Laboratório de robótica","description":"Equipar o laboratório de robótica da escola pública do bairro.","goalAmount":"5000.00","deadline":"2026-12-31T23:59:59Z","categoryId":3}'
+# curl -s -X POST $BASE/campaigns -H "Authorization: Bearer $TOKEN_ANA" -H 'Content-Type: application/json' -d '{"title":"Laboratório de robótica","description":"Equipar o laboratório de robótica da escola pública do bairro.","goalAmount":"5000.00","deadline":"2026-12-31","categoryId":3}'
 POST {{baseUrl}}/campaigns
 Authorization: Bearer {{tokenAna}}
 Content-Type: application/json
@@ -64,7 +64,7 @@ Content-Type: application/json
   "title": "Laboratório de robótica",
   "description": "Equipar o laboratório de robótica da escola pública do bairro.",
   "goalAmount": "5000.00",
-  "deadline": "2026-12-31T23:59:59Z",
+  "deadline": "2026-12-31",
   "categoryId": 3
 }
 
@@ -142,7 +142,7 @@ Content-Type: application/json
 { "amount": 10 }
 
 ### 14. Criar campanha sem doações (para testar exclusão)
-# curl -s -X POST $BASE/campaigns -H "Authorization: Bearer $TOKEN_ANA" -H 'Content-Type: application/json' -d '{"title":"Campanha temporária","description":"Campanha criada só para testar exclusão.","goalAmount":100,"deadline":"2026-12-31T23:59:59Z","categoryId":3}'
+# curl -s -X POST $BASE/campaigns -H "Authorization: Bearer $TOKEN_ANA" -H 'Content-Type: application/json' -d '{"title":"Campanha temporária","description":"Campanha criada só para testar exclusão.","goalAmount":100,"deadline":"2026-12-31","categoryId":3}'
 POST {{baseUrl}}/campaigns
 Authorization: Bearer {{tokenAna}}
 Content-Type: application/json
@@ -151,7 +151,7 @@ Content-Type: application/json
   "title": "Campanha temporária",
   "description": "Campanha criada só para testar exclusão.",
   "goalAmount": 100,
-  "deadline": "2026-12-31T23:59:59Z",
+  "deadline": "2026-12-31",
   "categoryId": 3
 }
 

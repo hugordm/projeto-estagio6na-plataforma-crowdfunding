@@ -140,14 +140,14 @@ const paths = {
         zodBody(campaignSchema, {
           descriptions: {
             goalAmount: moneyInput,
-            deadline: 'Data futura (ISO 8601).',
-            imageUrl: 'URL devolvida por POST /uploads/campaign-image ou /campaigns/ai-cover, ou URL http(s) externa. SVG só se for deste servidor.',
+            deadline: 'Dia do prazo em America/Sao_Paulo: "AAAA-MM-DD" (preferido) ou data e hora ISO 8601 (vale o dia desse instante em Brasília). Hoje ou depois; é gravado como o fim desse dia.',
+            imageUrl: 'URL devolvida por POST /uploads/campaign-image ou /campaigns/ai-cover, ou URL http(s) externa. SVG só se for um arquivo da plataforma (/uploads deste servidor ou a pasta do Cloudinary configurada). Ao trocar ou remover, a imagem antiga da plataforma é apagada.',
           },
           example: {
             title: 'Biblioteca comunitária do bairro',
             description: 'Montar uma biblioteca na sala da associação de moradores, com livros doados e um espaço de leitura.',
             goalAmount: '3000.00',
-            deadline: '2026-12-19T23:59:59.000Z',
+            deadline: '2026-12-19',
             categoryId: 2,
             imageUrl: 'http://localhost:3001/uploads/9b2f6c1e-1d2a-4c55-9e1f-0a7b3c2d4e5f.png',
           },
@@ -277,19 +277,27 @@ const paths = {
     post: {
       tags: ['Upload'],
       summary: 'Envia a imagem de capa',
-      description: 'JPEG, PNG ou WebP até 5 MB (o tipo é conferido pelos bytes do arquivo; SVG é recusado). Rate limit: 20 por hora.',
+      description:
+        'JPEG, PNG ou WebP até 5 MB (o tipo é conferido pelos bytes do arquivo; SVG é recusado). Rate limit: 20 por hora. ' +
+        'A URL devolvida é deste servidor (/uploads/...) ou a secure_url do Cloudinary, conforme STORAGE_PROVIDER. ' +
+        '502/503: falha ou falta de configuração do armazenamento.',
       security: bearer,
       requestBody: {
         required: true,
         content: { 'multipart/form-data': { schema: { type: 'object', required: ['image'], properties: { image: { type: 'string', format: 'binary' } } } } },
       },
-      responses: { '201': ok('Imagem salva.', ref('Url')), ...errors('BadRequest', 'Unauthorized', 'TooManyRequests') },
+      responses: {
+        '201': ok('Imagem salva.', ref('Url')),
+        ...errors('BadRequest', 'Unauthorized', 'TooManyRequests'),
+        '502': ok('Falha ao salvar no provedor de armazenamento.', ref('Error'), { error: 'Não foi possível salvar a imagem agora. Tente novamente em instantes.' }),
+        '503': ok('Armazenamento não configurado.', ref('Error'), { error: 'O armazenamento de imagens não está configurado.' }),
+      },
     },
   },
   '/uploads/{file}': {
     get: {
       tags: ['Upload'],
-      summary: 'Arquivo enviado ou capa gerada (estático)',
+      summary: 'Arquivo enviado ou capa gerada (estático, provedor local)',
       description: 'Enviado com X-Content-Type-Options: nosniff; SVG com Content-Security-Policy restritiva.',
       parameters: [{ name: 'file', in: 'path', required: true, schema: { type: 'string', example: '9b2f6c1e-1d2a-4c55-9e1f-0a7b3c2d4e5f.png' } }],
       responses: {

@@ -4,6 +4,7 @@ import { AiError, chat, type ChatMessage } from '../lib/llm';
 import { toPlainText } from '../lib/plain-text';
 import { getFeatures, type Features } from './features.service';
 import { daysLeft } from './campaign.service';
+import { isDeadlineOver } from '../lib/dates';
 import { findRelatedCampaigns } from './search.service';
 
 // Quantas mensagens do histórico vão para o modelo (as mais recentes).
@@ -70,8 +71,10 @@ function summarize(text: string): string {
 
 function deadlineText(campaign: RelatedCampaign): string {
   if (campaign.status !== 'ACTIVE') return 'encerrada';
+  if (isDeadlineOver(campaign.deadline)) return 'prazo encerrado';
   const days = daysLeft(campaign.deadline);
-  return days === 0 ? 'prazo encerrado' : `${days} ${days === 1 ? 'dia restante' : 'dias restantes'}`;
+  if (days === 0) return 'último dia para doar';
+  return `${days} ${days === 1 ? 'dia restante' : 'dias restantes'}`;
 }
 
 // Contexto com os dados reais das campanhas encontradas e como usá-los na resposta.

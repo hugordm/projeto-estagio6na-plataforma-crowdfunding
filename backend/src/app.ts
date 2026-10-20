@@ -10,8 +10,8 @@ import { uploadRoutes } from './routes/upload.routes';
 import { chatRoutes } from './routes/chat.routes';
 import { meRoutes } from './routes/me.routes';
 import { configRoutes } from './routes/config.routes';
-import { docsEnabled, docsRoutes } from './routes/docs.routes';
-import { UPLOADS_DIR, UPLOADS_ROUTE } from './services/storage.service';
+import { docsEnabled, docsRoutes, warnDocsConfig } from './routes/docs.routes';
+import { UPLOADS_DIR, UPLOADS_ROUTE, warnStorageConfig } from './services/storage.service';
 import { errorHandler, notFoundHandler } from './middlewares/error';
 
 // Prefixo de cada grupo de rotas. Também usado por scripts/docs-check.ts para conferir
@@ -51,9 +51,15 @@ app.get('/health-db', async (req, res) => {
 for (const [path, router] of routeMounts) app.use(path, router);
 
 // Documentação da API: GET /docs (Swagger UI) e GET /docs.json. Desligue com DOCS_ENABLED=false.
-if (docsEnabled()) app.use(docsRoutes);
+// Com DOCS_USER e DOCS_PASSWORD, exige HTTP Basic.
+if (docsEnabled()) {
+  warnDocsConfig();
+  app.use(docsRoutes);
+}
 
-// Arquivos enviados e capas geradas. nosniff impede o navegador de "adivinhar" outro tipo de conteúdo.
+warnStorageConfig();
+
+// Arquivos enviados e capas geradas (provedor local; continua servindo os antigos com STORAGE_PROVIDER=cloudinary). nosniff impede o navegador de "adivinhar" outro tipo de conteúdo.
 // Para SVG (capas da IA), uma CSP restritiva: mesmo aberto direto no navegador, o arquivo não pode
 // rodar scripts, carregar nada externo nem navegar (sandbox). O express.static já envia image/svg+xml.
 app.use(
