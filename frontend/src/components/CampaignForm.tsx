@@ -107,7 +107,7 @@ export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: Cam
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
 
   function handleCancel() {
-    if (confirmLeave()) goBack(router, cancelHref);
+    void confirmLeave().then((ok) => ok && goBack(router, cancelHref));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

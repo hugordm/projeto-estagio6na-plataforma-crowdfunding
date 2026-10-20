@@ -2,21 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { errorMessage, getMyCampaigns, updateCampaign } from "@/lib/api";
+import { deleteCampaign, errorMessage, getMyCampaigns, updateCampaign } from "@/lib/api";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import type { MyCampaign } from "@/types/campaign";
 import type { Paginated } from "@/types/pagination";
 import { CampaignCard } from "./CampaignCard";
+import { DeleteCampaignMessage } from "./DeleteCampaignMessage";
 import { Pagination } from "./Pagination";
 import { EmptyState, ErrorMessage, Loading } from "./StatusMessage";
 
-// Aba "Minhas campanhas": cards com as ações Ver, Editar e Encerrar.
+// Aba "Minhas campanhas": cards com as ações Ver, Editar, Encerrar e Excluir (só sem doações,
+// regra do backend). Encerrar e Excluir pedem confirmação no modal, que mostra o erro se falhar.
 export function MyCampaignsTab() {
   const [page, setPage] = useState(1);
-  const [reloadKey, setReloadKey] = useState(0); // muda para recarregar depois de encerrar
+  const [reloadKey, setReloadKey] = useState(0); // muda para recarregar depois de encerrar ou excluir
   const [result, setResult] = useState<Paginated<MyCampaign> | null>(null);
   const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [finishingId, setFinishingId] = useState<number | null>(null);
+  const askConfirm = useConfirm();
 
   useEffect(() => {
     let ignore = false;
@@ -35,17 +37,29 @@ export function MyCampaignsTab() {
   }, [page, reloadKey]);
 
   async function handleFinish(campaign: MyCampaign) {
-    if (!window.confirm(`Encerrar "${campaign.title}"? Ela deixará de receber doações.`)) return;
-    setActionError("");
-    setFinishingId(campaign.id);
-    try {
-      await updateCampaign(campaign.id, { status: "FINISHED" });
-      setReloadKey((key) => key + 1);
-    } catch (err) {
-      setActionError(errorMessage(err));
-    } finally {
-      setFinishingId(null);
-    }
+    const finished = await askConfirm({
+      title: "Encerrar campanha?",
+      message: <p>&ldquo;{campaign.title}&rdquo; deixará de receber doações.</p>,
+      confirmLabel: "Encerrar campanha",
+      pendingLabel: "Encerrando...",
+      action: () => updateCampaign(campaign.id, { status: "FINISHED" }),
+    });
+    if (finished) setReloadKey((key) => key + 1);
+  }
+
+  async function handleDelete(campaign: MyCampaign) {
+    const deleted = await askConfirm({
+      title: "Excluir campanha?",
+      message: <DeleteCampaignMessage title={campaign.title} />,
+      confirmLabel: "Excluir campanha",
+      pendingLabel: "Excluindo...",
+      variant: "danger",
+      action: () => deleteCampaign(campaign.id),
+    });
+    if (!deleted) return;
+    // Se era o último card da página, volta uma página (a atual ficaria vazia).
+    if (result && result.data.length === 1 && page > 1) setPage(page - 1);
+    else setReloadKey((key) => key + 1);
   }
 
   if (error) return <ErrorMessage message={error} />;
@@ -63,7 +77,6 @@ export function MyCampaignsTab() {
 
   return (
     <div className="space-y-4">
-      {actionError && <ErrorMessage message={actionError} />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {result.data.map((campaign) => (
           <div key={campaign.id} className="flex flex-col gap-2">
@@ -76,13 +89,13 @@ export function MyCampaignsTab() {
                 Editar
               </Link>
               {campaign.status === "ACTIVE" && (
-                <button
-                  type="button"
-                  className="btn btn-secondary px-3 py-1.5 text-xs"
-                  disabled={finishingId === campaign.id}
-                  onClick={() => handleFinish(campaign)}
-                >
-                  {finishingId === campaign.id ? "Encerrando..." : "Encerrar"}
+                <button type="button" className="btn btn-secondary px-3 py-1.5 text-xs" onClick={() => handleFinish(campaign)}>
+                  Encerrar
+                </button>
+              )}
+              {campaign.donorsCount === 0 && (
+                <button type="button" className="btn btn-danger px-3 py-1.5 text-xs" onClick={() => handleDelete(campaign)}>
+                  Excluir
                 </button>
               )}
             </div>

@@ -16,7 +16,7 @@ export function BackButton({ fallbackHref }: BackButtonProps) {
   const router = useRouter();
 
   function handleClick() {
-    if (confirmLeave()) goBack(router, fallbackHref);
+    void confirmLeave().then((ok) => ok && goBack(router, fallbackHref));
   }
 
   return (

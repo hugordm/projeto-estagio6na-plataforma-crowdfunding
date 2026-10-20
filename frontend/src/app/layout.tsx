@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { FeaturesProvider } from "@/contexts/FeaturesContext";
+import { ConfirmProvider } from "@/contexts/ConfirmContext";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Navbar } from "@/components/Navbar";
 import { NavigationTracker } from "@/components/NavigationTracker";
@@ -33,10 +34,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <FeaturesProvider>
-            <NavigationTracker />
-            <Navbar />
-            <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-            <ChatWidget />
+            <ConfirmProvider>
+              <NavigationTracker />
+              <Navbar />
+              <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+              <ChatWidget />
+            </ConfirmProvider>
           </FeaturesProvider>
         </AuthProvider>
       </body>

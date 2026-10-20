@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { deleteCampaign, errorMessage, getCampaign, updateCampaign } from "@/lib/api";
 import type { CampaignDetail } from "@/types/campaign";
 import { CampaignForm, type CampaignFormValues } from "@/components/CampaignForm";
 import { BackButton } from "@/components/BackButton";
 import { RequireAuth } from "@/components/RequireAuth";
+import { DeleteCampaignMessage } from "@/components/DeleteCampaignMessage";
 import { ErrorMessage, Loading } from "@/components/StatusMessage";
 
 // Edição da campanha (protegida por login; só o dono vê o formulário).
@@ -23,13 +25,13 @@ function EditCampaign() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
+  const askConfirm = useConfirm();
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loadError, setLoadError] = useState("");
-  // Erro/aviso das ações "Encerrar" e "Excluir" (ex.: 409 ao excluir com doações).
-  const [actionError, setActionError] = useState("");
+  // Aviso de sucesso de "Encerrar". Os erros de "Encerrar" e "Excluir" (ex.: 409 ao excluir com
+  // doações) aparecem dentro do modal de confirmação.
   const [actionMessage, setActionMessage] = useState("");
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -53,6 +55,8 @@ function EditCampaign() {
     return <ErrorMessage message="Somente o dono pode editar esta campanha." />;
   }
 
+  const { title } = campaign;
+
   // imageUrl null remove a imagem atual.
   async function handleUpdate(values: CampaignFormValues) {
     await updateCampaign(id, values);
@@ -60,33 +64,29 @@ function EditCampaign() {
   }
 
   async function handleFinish() {
-    if (!window.confirm("Encerrar a campanha? Ela deixará de receber doações.")) return;
-    setActionError("");
     setActionMessage("");
-    setBusy(true);
-    try {
-      setCampaign(await updateCampaign(id, { status: "FINISHED" }));
-      setActionMessage("Campanha encerrada.");
-    } catch (err) {
-      setActionError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+    const finished = await askConfirm({
+      title: "Encerrar campanha?",
+      message: <p>&ldquo;{title}&rdquo; deixará de receber doações.</p>,
+      confirmLabel: "Encerrar campanha",
+      pendingLabel: "Encerrando...",
+      action: async () => setCampaign(await updateCampaign(id, { status: "FINISHED" })),
+    });
+    if (finished) setActionMessage("Campanha encerrada.");
   }
 
   async function handleDelete() {
-    if (!window.confirm("Excluir a campanha definitivamente? Esta ação não pode ser desfeita.")) return;
-    setActionError("");
     setActionMessage("");
-    setBusy(true);
-    try {
-      await deleteCampaign(id);
-      router.replace("/"); // a campanha excluída não fica no histórico
-    } catch (err) {
+    const deleted = await askConfirm({
+      title: "Excluir campanha?",
+      message: <DeleteCampaignMessage title={title} />,
+      confirmLabel: "Excluir campanha",
+      pendingLabel: "Excluindo...",
+      variant: "danger",
       // Com doações o backend responde 409 explicando que é preciso encerrar em vez de excluir.
-      setActionError(errorMessage(err));
-      setBusy(false);
-    }
+      action: () => deleteCampaign(id),
+    });
+    if (deleted) router.replace("/"); // a campanha excluída não fica no histórico
   }
 
   return (
@@ -102,17 +102,16 @@ function EditCampaign() {
         <h2 className="text-lg font-semibold">Ações</h2>
         <div className="flex flex-wrap gap-3">
           {campaign.status === "ACTIVE" ? (
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={handleFinish}>
+            <button type="button" className="btn btn-secondary" onClick={handleFinish}>
               Encerrar campanha
             </button>
           ) : (
             <p className="text-sm text-zinc-600">Esta campanha já está encerrada.</p>
           )}
-          <button type="button" className="btn btn-danger" disabled={busy} onClick={handleDelete}>
+          <button type="button" className="btn btn-danger" onClick={handleDelete}>
             Excluir campanha
           </button>
         </div>
-        {actionError && <ErrorMessage message={actionError} />}
         {actionMessage && <p className="text-sm text-emerald-700">{actionMessage}</p>}
       </section>
     </div>
