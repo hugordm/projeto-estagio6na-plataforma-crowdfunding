@@ -1,180 +1,192 @@
-# Backend: Plataforma de Crowdfunding
+# Backend: API da Plataforma de Crowdfunding
 
-API REST em Node.js, Express 5 e TypeScript (ESM), com Prisma 7 (driver adapter `@prisma/adapter-pg`) e PostgreSQL no Neon. Visão geral do projeto, modelo de dados, lista completa de endpoints e decisões técnicas: [`../README.md`](../README.md). Requisições de teste: [`docs/requests.http`](docs/requests.http).
+API REST em **Node.js + Express 5 (ESM) + TypeScript**, com **Prisma 7** sobre **PostgreSQL** (Neon). Cuida de contas, campanhas, doações simuladas, upload de imagens, recursos de IA (Anthropic) e envio de e-mail (Resend). O frontend em `../frontend` é o único cliente pelo navegador.
 
-## 1. Como rodar
+Visão geral, arquitetura, modelo de dados, tabela completa de endpoints, decisões técnicas e deploy: [README da raiz](../README.md). Aqui ficam os detalhes do código do backend.
 
-Pré-requisitos: Node.js 20 ou superior, npm e um PostgreSQL com a extensão pgvector disponível (ex.: Neon), exigida só por uma migration antiga (seção 8).
+---
+
+## Como rodar
 
 ```bash
-cp .env.example .env        # preencha pelo menos DATABASE_URL e JWT_SECRET
+cp .env.example .env         # preencha pelo menos DATABASE_URL e JWT_SECRET
 npm install
-npx prisma migrate deploy   # aplica as migrations (em desenvolvimento: npx prisma migrate dev)
-npx prisma generate         # gera o Prisma Client em generated/prisma
-npx prisma db seed          # cria as 6 categorias (pode rodar mais de uma vez)
-npm run seed:demo           # opcional: dados de demonstração
-npm run dev                 # tsx watch src/server.ts, em http://localhost:3001
+npx prisma generate          # gera o Prisma Client em generated/prisma (necessário antes de rodar)
+npx prisma migrate deploy    # aplica as migrations no banco
+npx prisma db seed           # 6 categorias iniciais
+npm run seed:demo            # opcional: dados de demonstração
+npm run dev                  # http://localhost:3001  (Swagger em /docs)
 ```
 
-No Prisma 7 o seed é configurado em `prisma.config.ts` (`migrations.seed`) e **não** roda automaticamente após `migrate dev`: execute `npx prisma db seed` manualmente. O `prisma.config.ts` também carrega o `.env` (no Prisma 7 o CLI não faz isso sozinho).
+Com Docker, a partir da raiz: `docker compose up --build` (seção 10.2 do [README da raiz](../README.md#102-com-docker--docker-compose)).
 
-Checagens: `npx tsc --noEmit` (tipos) e `npm run lint` (ESLint). Não há testes automatizados (`npm test` é o placeholder padrão do npm).
+## Como testar
 
-As variáveis de ambiente estão descritas na seção 9 do [README da raiz](../README.md#9-variáveis-de-ambiente) e no `.env.example`.
+Não há testes automatizados (`npm test` é o placeholder do npm). A verificação é:
 
-## 2. Scripts
+- `npm run lint` e `npx tsc --noEmit` (estilo e tipos);
+- `npm run docs:check` (OpenAPI válido e igual às rotas registradas);
+- `GET /` e `GET /health-db` (servidor e banco);
+- Swagger UI em `/docs` ("Try it out" e **Authorize** com o token do login);
+- [`docs/requests.http`](docs/requests.http): requisições prontas (REST Client / JetBrains), com o curl equivalente em comentário;
+- `npm run check:ai` para conferir a IA sem abrir o site.
 
-| Comando | O que faz |
-|---------|-----------|
-| `npm run dev` | Sobe a API com `tsx watch` (reinicia ao salvar um arquivo; mudanças no `.env` exigem reiniciar). |
-| `npm run build` | Empacota `src/server.ts` com o esbuild em `dist/server.js` (pacotes do `node_modules` ficam externos). Requer `npx prisma generate` antes. |
-| `npm start` | Roda o servidor compilado (`node dist/server.js`). Usado pela imagem Docker. |
-| `npm run docs:check` | Valida a especificação OpenAPI e confere se toda rota registrada no Express está documentada (e vice-versa). |
-| `npm run lint` | ESLint (regras recomendadas do ESLint e do `typescript-eslint`, sem checagem por tipos). |
-| `npm run check:ai` | Diagnóstico da IA (Anthropic): provedores ativos, variáveis definidas (sem valores), recursos ligados e teste de chat. `-- --cover` testa a geração da capa SVG (com custo). |
-| `npm run seed:demo` / `npm run seed:demo:clean` | Cria / apaga os dados de demonstração (seção 9). |
-| `npm run cleanup:uploads` | Lista imagens órfãs do provedor ativo; com `-- --apply` apaga (Cloudinary: `-- --apply --confirm-cloudinary`) (seção 6). |
+## Scripts
 
-## 3. Estrutura de `src/`
+| Script | Arquivo | O que faz |
+|--------|---------|-----------|
+| `npm run dev` | `src/server.ts` | `tsx watch`: roda o TypeScript direto e reinicia ao salvar. |
+| `npm run build` | `src/server.ts` | esbuild empacota `src/` em `dist/server.js` (ESM, Node 22+, pacotes do `node_modules` ficam de fora). |
+| `npm start` | `dist/server.js` | Roda o servidor compilado (usado no Docker). |
+| `npm run lint` | `eslint.config.js` | ESLint com as regras recomendadas e typescript-eslint. |
+| `npm run docs:check` | `scripts/docs-check.ts` | Valida a especificação com `@apidevtools/swagger-parser` e compara, nos dois sentidos, as rotas de `routeMounts` com as operações documentadas. Sai com código 1 se houver diferença. |
+| `npm run seed:demo` | `scripts/seed-demo.ts` | Cria/atualiza (idempotente) 2 usuários `@example.com`, 5 campanhas "[Demo]" com prazo futuro e doações. Precisa das categorias do seed. A senha de demonstração é uma constante do script. |
+| `npm run seed:demo:clean` | `scripts/seed-demo.ts --clean` | Apaga só o que o script cria. |
+| `npm run check:ai` | `scripts/check-ai.ts` | Mostra os provedores, quais variáveis da IA estão definidas (sem valores), os recursos ligados e faz uma chamada curta de chat. `-- --cover` gera uma capa (tem custo) e salva o SVG na pasta temporária do sistema. |
+| `npm run cleanup:uploads` | `scripts/cleanup-orphan-uploads.ts` | Lista imagens do provedor ativo com mais de 24 h que nenhuma campanha nem registro de IA usa. `-- --apply` apaga no disco; no Cloudinary exige `-- --apply --confirm-cloudinary`. |
+| `npx prisma db seed` | `prisma/seed.ts` | Cria as categorias (configurado em `prisma.config.ts`). |
 
-Cada requisição segue `routes` → `controllers` → `services` → Prisma. Middlewares tratam autenticação, rate limit, upload e erros; `lib/` reúne utilitários e clientes de serviços externos.
+`scripts/docker-start.sh` não é script npm: é o comando de início do container (migrations com até 10 tentativas + `node dist/server.js`; com `LOCAL_DATABASE_URL`, usa esse banco).
 
+---
+
+## Estrutura
+
+```text
+backend/
+├── .env.example                 Modelo do .env (todas as variáveis, com comentários).
+├── .dockerignore                Exclui .env*, node_modules, dist, generated, uploads e docs da imagem.
+├── .gitignore                   Ignora .env, generated/, dist/ e o conteúdo de uploads/.
+├── Dockerfile                   Estágios build → prod-deps → runtime (usuário node, HEALTHCHECK em /).
+├── eslint.config.js             Configuração do ESLint (flat config).
+├── package.json                 Dependências e scripts.
+├── prisma.config.ts             Prisma 7: caminho do schema, das migrations, comando do seed e DATABASE_URL (via dotenv).
+├── tsconfig.json                Configuração do TypeScript.
+├── docs/requests.http           Requisições de exemplo para todas as rotas.
+├── uploads/.gitkeep             Destino das imagens com STORAGE_PROVIDER=local (servido em /uploads).
+├── prisma/
+│   ├── schema.prisma            Models e enum CampaignStatus. Gera o client em ../generated/prisma.
+│   ├── seed.ts                  Upsert das 6 categorias.
+│   └── migrations/
+│       ├── 20261019121326_add_user_password/          Tabela User com senha.
+│       ├── 20261019122315_campaigns_donations/        Category, Campaign, Donation.
+│       ├── 20261019135355_password_reset_tokens/      PasswordResetToken.
+│       ├── 20261019141435_ai_image_generations/       AiImageGeneration (limite diário de capas).
+│       ├── 20261019141854_pgvector_campaign_embedding/ Extensão vector, coluna embedding e índice HNSW (hoje sem uso).
+│       ├── 20261019143747_ai_cover/                   Campanha: imageGeneratedByAi; registro: url.
+│       ├── 20261019193515_user_token_version/         User.tokenVersion.
+│       └── migration_lock.toml
+├── scripts/                     docker-start.sh, docs-check.ts, seed-demo.ts, check-ai.ts, cleanup-orphan-uploads.ts.
+└── src/
+    ├── server.ts                Lê PORT e chama app.listen.
+    ├── app.ts                   Monta o Express (ver "Como as partes se conectam").
+    ├── types/express.d.ts       req.userId no tipo Request.
+    ├── routes/
+    │   ├── auth.routes.ts       /auth: register, login, forgot-password e reset-password (com rate limits).
+    │   ├── campaign.routes.ts   /campaigns: CRUD, search, ai-cover, ai-description, ai-category e /:id/donations.
+    │   ├── category.routes.ts   /categories: listagem.
+    │   ├── chat.routes.ts       /chat: optionalAuth + chatLimiter.
+    │   ├── config.routes.ts     /config/features.
+    │   ├── me.routes.ts         /me/campaigns e /me/donations (requireAuth em todas).
+    │   ├── upload.routes.ts     /uploads/campaign-image: requireAuth → uploadLimiter → multer.
+    │   └── docs.routes.ts       /docs e /docs.json: DOCS_ENABLED, HTTP Basic (DOCS_USER/DOCS_PASSWORD), docsLimiter.
+    ├── controllers/             Schemas zod de entrada + chamada ao service + status HTTP.
+    │   ├── auth.controller.ts        Regras de nome, e-mail e senha (8 a 72); resposta fixa no forgot-password.
+    │   ├── campaign.controller.ts    campaignSchema/updateCampaignSchema, prazo "AAAA-MM-DD", regra do SVG; list/search/getById/create/update/remove.
+    │   ├── donation.controller.ts    amount (moneySchema) e message (até 500).
+    │   ├── ai-cover.controller.ts    { title, description, categoryId? } → { url }.
+    │   ├── ai-writing.controller.ts  Melhorar descrição e sugerir categoria.
+    │   ├── chat.controller.ts        Histórico só com user/assistant, até 50 mensagens de até 1000 caracteres.
+    │   ├── me.controller.ts          Campanhas e doações do usuário logado (id vem do token).
+    │   ├── category.controller.ts    Lista categorias.
+    │   ├── config.controller.ts      Devolve getFeatures().
+    │   └── upload.controller.ts      Detecta o tipo pelos bytes e salva pelo storage.
+    ├── services/
+    │   ├── auth.service.ts           Cadastro e login (bcrypt custo 10), emissão do JWT.
+    │   ├── password-reset.service.ts Token SHA-256, 30 min, uso único, incrementa tokenVersion.
+    │   ├── campaign.service.ts       Listagem/filtros, totais (groupBy), daysLeft/expired, dono, exclusão com doações (409), descarte de imagens.
+    │   ├── donation.service.ts       Regras da doação simulada e listagens paginadas.
+    │   ├── category.service.ts       Categorias em ordem alfabética.
+    │   ├── search.service.ts         /campaigns/search (texto) e busca pontuada de campanhas para o chat.
+    │   ├── chat.service.ts           Prompt do assistente (depende dos recursos ligados), contexto de campanhas, histórico (10 últimas).
+    │   ├── ai-description.service.ts Reescrita da descrição.
+    │   ├── ai-category.service.ts    Escolha de uma categoria existente.
+    │   ├── ai-cover.service.ts       COVER_PROVIDER, reserva/limite, geração e erros amigáveis.
+    │   ├── svg-cover.service.ts      Prompt do SVG 1200x675, chamada ao Sonnet, sanitização (2 tentativas).
+    │   ├── ai-usage.service.ts       Limite de 5 capas/24 h na tabela AiImageGeneration; reconhece capas da IA pela URL.
+    │   ├── features.service.ts       { aiCover, aiChat, aiWriting } e avisos de configuração no início.
+    │   └── storage.service.ts        Interface Storage: disco (local) ou Cloudinary; save/delete/isOwnUploadUrl.
+    ├── middlewares/
+    │   ├── auth.ts              requireAuth, optionalAuth, getUserId (JWT + tokenVersion no banco).
+    │   ├── rate-limit.ts        Todos os limitadores (express-rate-limit, em memória).
+    │   ├── upload.ts            multer em memória, 5 MB, um arquivo no campo "image"; erros em português.
+    │   └── error.ts             404 e errorHandler: HttpError, ZodError e JSON inválido → { error }.
+    ├── lib/
+    │   ├── prisma.ts            Prisma Client com @prisma/adapter-pg (DATABASE_URL).
+    │   ├── jwt.ts               signToken/verifyToken (7 dias, claims sub e ver).
+    │   ├── http-config.ts       corsOrigins() (FRONTEND_URL) e trustProxySetting() (TRUST_PROXY).
+    │   ├── http-error.ts        Classe HttpError(status, mensagem).
+    │   ├── pagination.ts        idParamSchema, paginationSchema (limit até 50) e buildMeta.
+    │   ├── money.ts             moneySchema (Decimal, até 2 casas), formatMoney, calcProgress.
+    │   ├── dates.ts             Prazo em America/Sao_Paulo: endOfDeadlineDay, diffCalendarDays, isDeadlineOver.
+    │   ├── image-type.ts        Detecção JPEG/PNG/WebP pelos bytes; GENERATED_SVG; isSvgUrl.
+    │   ├── svg-sanitize.ts      Tokenizador estrito e reconstrução do SVG por allowlist (até 200 KB).
+    │   ├── llm.ts               Camada de texto: CHAT_PROVIDER → anthropic.chat().
+    │   ├── anthropic.ts         SDK oficial: chat (Haiku) e generateLongText por streaming (Sonnet), retry e tradução de erros.
+    │   ├── ai-types.ts          ChatMessage, ChatOptions e AiError (kind: not_configured, timeout, rejected...).
+    │   ├── ai-http-error.ts     AiError → HttpError com mensagem amigável.
+    │   ├── plain-text.ts        Remove markdown que escape das respostas do chat.
+    │   ├── search-terms.ts      Termos de busca sem acentos e sem palavras vazias.
+    │   ├── cloudinary.ts        Upload, exclusão e listagem por fetch com assinatura SHA-1; esconde chaves nos logs.
+    │   ├── mailer.ts            Envio pelo Resend (fetch) se RESEND_API_KEY e RESEND_FROM_EMAIL existirem.
+    │   ├── email-templates.ts   E-mail de recuperação de senha (HTML com escape).
+    │   └── network.ts           Aumenta o timeout de tentativa de conexão IPv4/IPv6 para 2 s.
+    └── docs/
+        ├── openapi.ts           Documento OpenAPI 3 (operações, tags, segurança Bearer).
+        ├── components.ts        Schemas de resposta e exemplos escritos à mão.
+        └── zod-schema.ts        Converte os schemas zod dos controllers em JSON Schema (z.toJSONSchema).
 ```
-src/
-├── server.ts                  Ponto de entrada: app.listen(PORT).
-├── app.ts                     App Express: trust proxy, CORS, rotas (routeMounts), /docs, /uploads estático (CSP para SVG) e erros.
-├── docs/                      Especificação OpenAPI 3.0 (servida em /docs e /docs.json).
-│   ├── openapi.ts             Caminhos, tags e documento final.
-│   ├── components.ts          Modelos de resposta, erros ({ error }), paginação e segurança Bearer.
-│   └── zod-schema.ts          z.toJSONSchema: corpos e parâmetros a partir dos schemas zod dos controllers.
-├── routes/                    Método + caminho + middlewares; chamam um controller.
-│   ├── auth.routes.ts         /auth/register, /login, /forgot-password, /reset-password.
-│   ├── campaign.routes.ts     /campaigns (CRUD, /search, /ai-cover, /ai-description, /ai-category, doações).
-│   ├── category.routes.ts     /categories.
-│   ├── chat.routes.ts         /chat (optionalAuth + chatLimiter).
-│   ├── config.routes.ts       /config/features.
-│   ├── docs.routes.ts         /docs (Swagger UI) e /docs.json; DOCS_ENABLED=false desliga; HTTP Basic opcional.
-│   ├── me.routes.ts           /me/campaigns e /me/donations (requireAuth em todas).
-│   └── upload.routes.ts       /uploads/campaign-image (requireAuth, uploadLimiter, multer).
-├── controllers/               Leem req, validam com zod (schemas exportados, usados também pela documentação) e chamam o service.
-├── services/                  Regras de negócio, Prisma e serviços externos.
-│   ├── auth.service.ts            Cadastro e login (bcrypt custo 10, JWT com tokenVersion).
-│   ├── password-reset.service.ts  Token de recuperação e envio do e-mail.
-│   ├── campaign.service.ts        CRUD, totais de doações, progresso, daysLeft e expired.
-│   ├── donation.service.ts        Regras de doação e listas de doações.
-│   ├── category.service.ts        Categorias.
-│   ├── storage.service.ts         Interface Storage: disco (uploads/) ou Cloudinary, por STORAGE_PROVIDER.
-│   ├── search.service.ts          Busca por texto (GET /campaigns/search) e busca textual para o chat.
-│   ├── ai-usage.service.ts        Limite diário de capas por IA.
-│   ├── ai-cover.service.ts        Provedor da capa (COVER_PROVIDER) e fluxo de geração.
-│   ├── svg-cover.service.ts       Capa em SVG pelo Claude Sonnet.
-│   ├── ai-description.service.ts  "Melhorar descrição com IA".
-│   ├── ai-category.service.ts     "Sugerir categoria".
-│   ├── chat.service.ts            Chatbot: prompt e contexto de campanhas.
-│   └── features.service.ts        Recursos de IA ligados (/config/features).
-├── middlewares/
-│   ├── auth.ts                requireAuth / optionalAuth / getUserId.
-│   ├── rate-limit.ts          Todos os limitadores (express-rate-limit).
-│   ├── upload.ts              multer em memória, 1 arquivo, 5 MB.
-│   └── error.ts               404 e errorHandler ({ error }).
-├── lib/
-│   ├── prisma.ts              Prisma Client único (adapter pg, maxWait 10 s).
-│   ├── http-config.ts         corsOrigins (FRONTEND_URL) e trustProxySetting (TRUST_PROXY).
-│   ├── network.ts             Timeout de 2 s por tentativa de conexão (Neon, Anthropic, Resend, Cloudinary).
-│   ├── jwt.ts                 signToken / verifyToken (claims sub e ver).
-│   ├── http-error.ts          HttpError(status, mensagem).
-│   ├── money.ts               moneySchema, formatMoney, calcProgress.
-│   ├── dates.ts               todayInSaoPaulo, diffCalendarDays, endOfDeadlineDay, isDeadlineOver (fuso America/Sao_Paulo).
-│   ├── pagination.ts          paginationSchema, buildMeta, idParamSchema.
-│   ├── image-type.ts          detectImageType (bytes), isSvgUrl.
-│   ├── svg-sanitize.ts        sanitizeSvg, extractSvg.
-│   ├── mailer.ts              sendEmail pelo Resend (fetch, timeout de 10 s).
-│   ├── email-templates.ts     E-mail de recuperação de senha (HTML e texto).
-│   ├── ai-types.ts            ChatMessage, ChatOptions, AiError.
-│   ├── ai-http-error.ts       AiError -> HttpError com mensagem amigável.
-│   ├── llm.ts                 chat() e isChatConfigured() conforme CHAT_PROVIDER.
-│   ├── anthropic.ts           Cliente do Claude (SDK oficial).
-│   ├── cloudinary.ts          Cliente do Cloudinary (fetch): upload e destroy assinados (SHA-1), listagem (Admin API).
-│   ├── plain-text.ts          toPlainText (remove markdown).
-│   └── search-terms.ts        normalizeText e searchTerms (busca textual).
-└── types/express.d.ts         req.userId.
-```
 
-Outras pastas e arquivos: `prisma/` (schema, migrations e seed), `scripts/` (seção 2, mais `docker-start.sh`), `docs/requests.http`, `Dockerfile` e `.dockerignore` (ver seção Docker do [README da raiz](../README.md#13-docker)), `dist/` (build, não versionado), `generated/prisma/` (Prisma Client gerado, não editar nem versionar) e `uploads/` (arquivos enviados; ignorada pelo git, exceto o `.gitkeep`).
+## Como as partes se conectam
 
-## 4. Convenções da API
+1. **`app.ts`** configura `trust proxy` (`TRUST_PROXY`), CORS (`FRONTEND_URL`) e `express.json()`, define `/` e `/health-db`, registra os roteadores da lista `routeMounts` (`/auth`, `/categories`, `/campaigns`, `/uploads`, `/chat`, `/me`, `/config`), liga `/docs` se `DOCS_ENABLED` não for `false`, serve `uploads/` em `/uploads` (com `nosniff` e CSP nos SVG) e por último o 404 e o `errorHandler`.
+2. **Rota → middlewares → controller:** por exemplo, `POST /campaigns/ai-cover` passa por `requireAuth` e `aiImageLimiter` antes de `ai-cover.controller.ts`.
+3. **Controller → service:** o controller faz `schema.parse(req.body)` (um `ZodError` vira 400) e chama o service com dados já convertidos (`Decimal`, `Date`).
+4. **Service → lib:** banco via `lib/prisma.ts`; IA via `lib/llm.ts` (texto) ou `svg-cover.service.ts` → `lib/anthropic.ts` (capa); imagens via `storage.service.ts` → disco ou `lib/cloudinary.ts`; e-mail via `lib/mailer.ts`.
+5. **Erros:** services lançam `HttpError`; falhas de IA viram `AiError` e são traduzidas em mensagens amigáveis; tudo sai como `{ error }`.
+6. **Documentação:** `docs/openapi.ts` importa os schemas zod exportados pelos controllers, então mudar uma regra de validação muda o Swagger. `scripts/docs-check.ts` importa `app` e `routeMounts`.
 
-- **Autenticação:** `Authorization: Bearer <token>`. JWT de 7 dias com `sub` = id do usuário e `ver` = `User.tokenVersion`. `requireAuth` confere no banco se a versão é a atual; redefinir a senha incrementa a versão e invalida todos os tokens anteriores. Tokens sem `ver` (anteriores à migration `user_token_version`) são recusados com 401. `optionalAuth` (chat) segue como visitante se o token for inválido.
-- **Senha:** 8 a 72 caracteres no cadastro e na redefinição (72 é o limite do bcrypt), mensagem "A senha deve ter de 8 a 72 caracteres."; o login não tem mínimo. `passwordHash` nunca é retornado.
-- **Erros:** sempre `{ "error": "mensagem em português" }`; validação inválida (zod) → 400; JSON malformado → 400; rota inexistente → 404; erro não tratado → 500 com mensagem genérica (detalhe só no log).
-- **Valores monetários:** `Decimal(12,2)` no banco e `Prisma.Decimal` no código. Entrada: número ou string com até 2 casas, maior que zero e até 9.999.999.999,99. Saída: sempre string com 2 casas (ex.: `"150.50"`). `progress` é um número percentual com 2 casas e pode passar de 100.
-- **Valor arrecadado:** não é coluna; é a soma das doações calculada a cada consulta. `donorsCount` conta doadores distintos.
-- **Prazo:** dia de calendário em America/Sao_Paulo (`lib/dates.ts`), qualquer que seja o fuso do servidor. Entrada `"AAAA-MM-DD"` (ou data e hora ISO, que vale o dia daquele instante em Brasília), hoje ou depois; gravado como o fim do dia (23:59:59.999 em Brasília). Toda campanha devolvida tem `daysLeft` (dias de calendário até o prazo: hoje = 0, nunca negativo) e `expired` (o dia do prazo já terminou). Doações são aceitas até o fim do dia do prazo.
-- **Paginação:** `page` (mín. 1) e `limit` (1 a 50, padrão 10); resposta `{ data, meta: { page, limit, total, totalPages } }`.
-- **CORS:** só as origens de `FRONTEND_URL` (separadas por vírgula; padrão `http://localhost:3000`) podem chamar a API pelo navegador. curl, scripts e a Swagger UI em `/docs` (mesma origem) não dependem disso.
-- **Proxy:** `TRUST_PROXY` (vazio/`false` por padrão; `1` atrás de um proxy como o do Render) define quando confiar no `X-Forwarded-For`, para o rate limit usar o IP real.
-- **Documentação:** Swagger UI em `/docs` e OpenAPI em `/docs.json` (desligue com `DOCS_ENABLED=false`; com `DOCS_USER` e `DOCS_PASSWORD`, exige HTTP Basic, com rate limit de 20 falhas/15 min por IP). Ao criar ou mudar uma rota, atualize `src/docs/openapi.ts` e rode `npm run docs:check`.
+## Convenções da API
 
-## 5. Recuperação de senha
+- Erros: `{ "error": "mensagem em português" }`.
+- Listas: `{ data, meta: { page, limit, total, totalPages } }`, `limit` de 1 a 50.
+- Dinheiro: entrada número ou string com até 2 casas; saída string `"150.50"`; `progress` é número e pode passar de 100.
+- Prazo: entrada `"AAAA-MM-DD"` (ou ISO); gravado como 23:59:59.999 em São Paulo; saída com `daysLeft` (≥ 0) e `expired`.
+- Autenticação: `Authorization: Bearer <token>`; o id do usuário sempre vem do token, nunca da URL.
 
-1. `POST /auth/forgot-password` gera um token aleatório de 256 bits, guarda **só o SHA-256** em `PasswordResetToken` (validade de 30 min), apaga os tokens ainda não usados do usuário e envia o link `FRONTEND_URL/reset-password?token=...` pelo Resend (`lib/mailer.ts`). O envio é em segundo plano: a resposta não espera o Resend, tem sempre o mesmo texto e não revela se o e-mail existe.
-2. `POST /auth/reset-password` confere o hash (existe, não usado, não expirado) e, numa transação, marca `usedAt` (uso único, mesmo com requisições simultâneas), grava o novo hash bcrypt e incrementa `tokenVersion`.
-3. Rate limit: 10 pedidos a cada 15 min por IP (somando as duas rotas) e 3 por hora por e-mail no `forgot-password`.
+## Variáveis de ambiente
 
-**Testar o envio real:** com uma conta no Resend, preencha `RESEND_API_KEY` e `RESEND_FROM_EMAIL`. Sem domínio verificado, use `RESEND_FROM_EMAIL="Crowdfunding <onboarding@resend.dev>"`: o Resend só entrega para o e-mail do dono da conta. **Sem Resend configurado**, o link aparece no console do servidor (somente quando `NODE_ENV` não é `production`).
+Lista completa, com obrigatoriedade e exemplos, na [seção 9.1 do README da raiz](../README.md#91-backend-backendenv-ou-painel-do-render). Modelo comentado: [`.env.example`](.env.example). Resumo:
 
-## 6. Upload de imagens
+- **Mínimo para rodar:** `DATABASE_URL`, `JWT_SECRET`.
+- **HTTP:** `PORT`, `BACKEND_URL`, `FRONTEND_URL`, `TRUST_PROXY`, `NODE_ENV`.
+- **Swagger:** `DOCS_ENABLED`, `DOCS_USER`, `DOCS_PASSWORD`.
+- **Imagens:** `STORAGE_PROVIDER`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_URL`, `CLOUDINARY_FOLDER` (e `CLOUDINARY_UPLOAD_PREFIX`, só para testes com servidor falso).
+- **E-mail:** `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
+- **IA:** `CHAT_PROVIDER`, `COVER_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_COVER_MODEL`.
 
-- `services/storage.service.ts` define a interface `Storage` (`save`, `owns`, `remove`) com duas implementações, escolhidas por `STORAGE_PROVIDER`:
-  - `local` (padrão, `DiskStorage`): grava em `uploads/` com nome aleatório (UUID); o Express serve a pasta em `/uploads` com `X-Content-Type-Options: nosniff` (e CSP restritiva no SVG).
-  - `cloudinary` (`CloudinaryStorage` + `lib/cloudinary.ts`): upload assinado para `CLOUDINARY_FOLDER/<uuid>` (padrão `crowdfunding/campaigns`), sem sobrescrever; a `imageUrl` é a `secure_url` (`https://res.cloudinary.com/...`). A capa SVG da IA (já sanitizada) vai como `resource_type: image`, e a URL salva recebe `fl_sanitize`. Falha do provedor → 502 com mensagem genérica; sem credenciais → 503 (e aviso ao iniciar). Chave e segredo nunca vão para o log.
-  - O resto do código usa só `saveImage`, `deleteImage` e `isOwnUploadUrl`. As duas implementações reconhecem os próprios arquivos sempre, então URLs `/uploads/...` antigas continuam válidas (e apagáveis) com o Cloudinary ativo, e vice-versa (se as credenciais continuarem configuradas).
-- **Testes sem conta real:** `CLOUDINARY_UPLOAD_PREFIX` (mesmo nome usado pelo SDK oficial; padrão `https://api.cloudinary.com`) troca o endereço da API, por exemplo para um servidor falso local. Não defina em produção.
-- **Troca e remoção:** ao trocar a capa, removê-la (`imageUrl: null`) ou excluir a campanha, o arquivo antigo é apagado no provedor a que a URL pertence, se nenhuma outra campanha usar a mesma URL. Falha ao apagar é registrada no log e a requisição segue normalmente.
-- `middlewares/upload.ts` usa o `multer` em memória (5 MB, um arquivo, campo `image`). O tipo é decidido pelos primeiros bytes (`lib/image-type.ts`): só JPEG, PNG e WebP; SVG enviado por usuário é recusado.
-- `imageUrl` da campanha aceita a URL devolvida pelo upload ou uma URL `http(s)` externa, exceto `.svg`: SVG só é aceito se o arquivo for da plataforma (`/uploads` deste servidor ou a conta e a pasta do Cloudinary configuradas), ou seja, a capa gerada e sanitizada. Na edição, `imageUrl: null` remove a imagem.
-- `Campaign.imageGeneratedByAi` é calculado pelo backend: `true` só se a `imageUrl` estiver registrada em `AiImageGeneration`.
-- **Arquivos órfãos:** `npm run cleanup:uploads` lista, no provedor ativo, arquivos com mais de 24 h que nenhuma campanha (`imageUrl`) nem geração de IA (`AiImageGeneration.url`) referencia. Local: só apaga com `-- --apply` (o `.gitkeep` nunca é apagado). Cloudinary: lista a pasta pela Admin API e só apaga com `-- --apply --confirm-cloudinary`. Não roda sozinho (pode ser agendado).
+Ao iniciar, o servidor avisa no log (sem mostrar valores) sobre configurações incoerentes: só um de `DOCS_USER`/`DOCS_PASSWORD`, `/docs` aberto em produção, `STORAGE_PROVIDER` inválido ou sem credenciais, `CHAT_PROVIDER`/`COVER_PROVIDER` não suportados.
 
-## 7. IA
+## Recursos específicos
 
-| Recurso | Provedor (variável) | Onde |
-|---------|---------------------|------|
-| Texto: chatbot, melhorar descrição, sugerir categoria | `CHAT_PROVIDER`: `anthropic` (padrão; Claude Haiku 5.5) | `lib/llm.ts` → `lib/anthropic.ts` |
-| Capa | `COVER_PROVIDER`: `anthropic-svg` (padrão; Claude Sonnet 5.5) | `services/ai-cover.service.ts` → `services/svg-cover.service.ts` |
+**Recuperação de senha.** Sem Resend configurado e fora de produção, o link aparece no console do servidor (útil no desenvolvimento). Detalhes da segurança na seção 8 do [README da raiz](../README.md#8-decisões-técnicas).
 
-Toda a IA usa a Anthropic. As duas variáveis continuam como ponto de escolha do provedor; um valor não suportado desliga o recurso correspondente e `warnAiConfig()` (`services/features.service.ts`) registra um aviso ao iniciar, sem derrubar o servidor.
+**Imagens.** Upload por `POST /uploads/campaign-image` (multipart, campo `image`). Com `STORAGE_PROVIDER=local`, os arquivos vão para `uploads/` com nome UUID; com `cloudinary`, para `CLOUDINARY_FOLDER`. A capa SVG da IA é salva pelo mesmo `saveImage`; no Cloudinary a URL recebe `fl_sanitize`.
 
-- **Contrato comum** (`lib/ai-types.ts`): erros viram `AiError` com `kind` (`not_configured`, `invalid_key`, `no_credits`, `rate_limited`, `timeout`, `unavailable`, `rejected`, `bad_response`); `AnthropicError` estende `AiError`. Os serviços tratam só `AiError` e respondem com mensagem amigável (`lib/ai-http-error.ts`). Nenhuma falha de IA derruba o servidor.
-- **Recursos ligados** (`GET /config/features`, `services/features.service.ts`): `aiCover` = `isCoverConfigured()` (provedor válido + chave da Anthropic; o modelo tem padrão); `aiChat` e `aiWriting` = `isChatConfigured()` (idem). O frontend esconde o que estiver desligado.
-- **Anthropic** (`lib/anthropic.ts`, SDK oficial `@anthropic-ai/sdk`): chat com `ANTHROPIC_CHAT_MODEL` (padrão `claude-haiku-5-5`), timeout de 30 s, `effort: "low"` e sem `temperature` (o Haiku 5.5 recusa valores fora do padrão); o raciocínio interno conta em `max_tokens`, por isso o limite é a cota da resposta + 2000 tokens. A retentativa do SDK fica desligada; `withRetry()` tenta de novo após 800 ms em limite de uso, indisponibilidade e rede (timeout não é repetido).
-- **Capa SVG** (`services/svg-cover.service.ts`): prompt fixo pedindo um único `<svg>` com `viewBox="0 0 1200 675"`, ilustração plana e geométrica, sem texto, pessoas reais, imagens externas ou scripts. Usa `ANTHROPIC_COVER_MODEL` (padrão `claude-sonnet-5-5`) por streaming, `max_tokens` 32000, `effort: "medium"`, prazo de 150 s e `fallbacks: "default"`. O código é separado do texto em volta (`extractSvg`) e sanitizado (`lib/svg-sanitize.ts`): reconstruído só com `svg, g, path, rect, circle, ellipse, line, polyline, polygon, defs, linearGradient, radialGradient, stop, clipPath, mask` e atributos permitidos; DOCTYPE/entidades/CDATA, tags que não fecham, texto solto, SVG vazio ou acima de 200 KB são rejeitados. SVG inválido: uma nova tentativa e depois mensagem amigável.
-- **Fluxo da capa:** reserva no limite diário → geração → salva pelo `storage.service` → grava a URL na reserva → `{ url }`. Em falha, a reserva é desfeita (não consome o limite).
-- **Melhorar descrição** (`services/ai-description.service.ts`): prompt fixo que reescreve em português usando **somente** fatos, objetos, ações e números do título e da descrição originais, sem acrescentar atividades, benefícios, locais, públicos ou promessas; se faltar informação, só melhora clareza e gramática; mantém os verbos e as palavras principais quando corretos. O texto do usuário vai entre marcadores `<descricao>`; a resposta passa por `toPlainText()` e precisa ter de 10 a 5000 caracteres.
-- **Sugerir categoria** (`services/ai-category.service.ts`): as categorias vêm do banco (`id = nome`); o modelo responde só o número e o backend confere se o id existe.
-- **Chatbot** (`services/chat.service.ts`): histórico validado (só `user`/`assistant`, até 1000 caracteres por mensagem e 50 mensagens; o modelo recebe as 10 últimas). O prompt é montado por `buildSystemPrompt(getFeatures())` e só menciona recursos de IA ligados. Antes de responder, `findRelatedCampaigns` traz até 3 campanhas pela busca textual (`findRelatedCampaignsByText`: pergunta normalizada e sem palavras vazias por `lib/search-terms.ts`; cada termo vale 1 ponto se aparecer no título, na descrição ou na categoria; entram campanhas ativas que batem a maioria dos termos, ou metade incluindo o mais longo; comparação sem acentos com `translate()` + `lower()` no PostgreSQL, sem precisar da extensão `unaccent`). O contexto leva só campos públicos (título, categoria, resumo, meta, arrecadado, dias restantes e o caminho `/campaigns/<id>`). Resposta em texto puro (`toPlainText()`).
-- **Limites de uso** (`middlewares/rate-limit.ts`, em memória, por usuário ou IP): chat 15/min, busca por texto (`/campaigns/search`) 30/min, capa 3 a cada 10 min, escrita por IA 10 a cada 10 min, upload 20/hora. Diário de capas: 5 por usuário a cada 24 h, contadas na tabela `AiImageGeneration` (sobrevive a reinícios).
+**IA.** Chat, descrição e categoria usam `ANTHROPIC_CHAT_MODEL` (padrão `claude-haiku-5-5`, esforço baixo, timeout de 30 s, uma nova tentativa em erro passageiro). A capa usa `ANTHROPIC_COVER_MODEL` (padrão `claude-sonnet-5-5`) por streaming, com prazo de 150 s e até 2 tentativas se o SVG vier inválido. Sem `ANTHROPIC_API_KEY`, os recursos ficam ocultos e as rotas de IA respondem 503 com mensagem amigável.
 
-## 8. Banco e migrations
+## Banco e migrations
 
-- **Migrations** (`prisma/migrations/`): `add_user_password`, `campaigns_donations`, `password_reset_tokens`, `ai_image_generations`, `pgvector_campaign_embedding`, `ai_cover` e `user_token_version`.
-- **Coluna `embedding` sem uso:** a migration `pgvector_campaign_embedding` habilitou a extensão `vector`, adicionou `Campaign.embedding vector(1024)` (no schema: `Unsupported("vector(1024)")?`, que o Prisma Client não lê) e criou o índice HNSW `Campaign_embedding_hnsw_idx`. A busca semântica com embeddings foi implementada e depois removida do escopo; a coluna `embedding` permanece sem uso: nenhum código lê ou grava nela. Não foi criada migration destrutiva; uma migration futura pode apagar a coluna, o índice e a extensão.
-- **Atenção em novas migrations (enquanto a coluna existir):** o Prisma não representa índices HNSW no schema e tenta apagá-lo. Sempre crie a migration com `npx prisma migrate dev --create-only --name <nome>`, **remova do SQL gerado a linha `DROP INDEX "Campaign_embedding_hnsw_idx";`** e só então aplique com `npx prisma migrate dev` (ou `migrate deploy`). Depois, rode `npx prisma generate`.
-- **Rede:** o Prisma CLI pode travar ou dar P1001 com o Neon em redes com latência alta; nesse caso, rode com `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000` e confira o resultado com `npx prisma migrate status`. Em tempo de execução, `lib/network.ts` aumenta o tempo por tentativa de conexão para 2 s e `lib/prisma.ts` aumenta o `maxWait` das transações para 10 s.
-
-## 9. Dados de demonstração
-
-`npm run seed:demo` (`scripts/seed-demo.ts`) cria 2 usuários e 5 campanhas fictícias (títulos começam com `[Demo]`), com prazos no futuro, nas categorias do seed, e doações de exemplo (sempre do outro usuário). É idempotente: rodar de novo atualiza os mesmos registros e empurra os prazos para o futuro. Requer as categorias (`npx prisma db seed`).
-
-| E-mail | Senha |
-|--------|-------|
-| `ana.demo@example.com` | `demo1234` |
-| `bruno.demo@example.com` | `demo1234` |
-
-`npm run seed:demo:clean` apaga só o que o script cria: os dois usuários, as campanhas deles (com as doações recebidas) e as doações que eles fizeram.
-
-## 10. Lint e TypeScript
-
-`npm run lint` roda o ESLint 10 com `eslint.config.js`: regras recomendadas do ESLint e do `typescript-eslint` (sem checagem por tipos) e nomes começando com `_` tratados como ignorados de propósito.
-
-O backend usa **TypeScript 6.0**: o `typescript-eslint` ainda não suporta o TypeScript 7 (a versão nativa em Go não tem a API JavaScript que o parser usa). O 7.0 é um port do 6.0 com o mesmo sistema de tipos; quando houver suporte, basta atualizar. O projeto não gera JavaScript compilado (`noEmit`): o `tsx` executa o TypeScript direto, em desenvolvimento e nos scripts.
+- O Prisma Client é gerado em `generated/prisma` (fora do git): rode `npx prisma generate` depois de clonar ou de mudar o schema.
+- Produção e Docker usam `npx prisma migrate deploy` (feito pelo `docker-start.sh`).
+- **Cuidado com o índice HNSW:** a coluna `embedding` (`vector(1024)`) e o índice `Campaign_embedding_hnsw_idx` não são usados pelo código, mas continuam no banco. O Prisma não enxerga esse índice e tenta apagá-lo ao gerar migrations. Crie migrations com `npx prisma migrate dev --create-only`, remova a linha `DROP INDEX "Campaign_embedding_hnsw_idx"` do SQL gerado (a menos que a intenção seja remover a busca vetorial de vez) e só então aplique.

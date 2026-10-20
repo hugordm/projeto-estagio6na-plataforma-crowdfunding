@@ -1,156 +1,152 @@
-# Frontend: Plataforma de Crowdfunding
+# Frontend: Site da Plataforma de Crowdfunding
 
-Interface em Next.js 16 (App Router), React 19, TypeScript e Tailwind CSS 4. As páginas são client-side (`"use client"`) e conversam com a API do backend por um único módulo, `src/lib/api.ts`. Visão geral do projeto, stack, endpoints e decisões técnicas: [`../README.md`](../README.md).
+Site em **Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4**. As páginas rodam no navegador (client components) e conversam com a API do `../backend` por `fetch`, através de um único módulo (`src/lib/api.ts`). Em produção fica na Vercel.
 
-## 1. Como rodar
+Visão geral, arquitetura, decisões técnicas e deploy: [README da raiz](../README.md). Aqui ficam os detalhes do código do frontend.
 
-Pré-requisitos: Node.js 20 ou superior e o backend rodando (por padrão em `http://localhost:3001`).
+---
+
+## Como rodar
 
 ```bash
-cp .env.local.example .env.local   # ajuste NEXT_PUBLIC_API_URL se a API estiver em outro endereço
+cp .env.local.example .env.local   # NEXT_PUBLIC_API_URL=http://localhost:3001
 npm install
-npm run dev                        # http://localhost:3000
+npm run dev                        # http://localhost:3000 (com o backend rodando em 3001)
 ```
+
+Com Docker, a partir da raiz: `docker compose up --build` (seção 10.2 do [README da raiz](../README.md#102-com-docker--docker-compose)).
+
+## Scripts
 
 | Script | O que faz |
 |--------|-----------|
-| `npm run dev` | Servidor de desenvolvimento. |
-| `npm run build` | Build de produção (inclui a checagem de TypeScript). |
-| `npm run start` | Serve o build de produção. |
-
-O `next.config.ts` usa `output: "standalone"`: o build também gera `.next/standalone/server.js`, um servidor mínimo usado pela imagem Docker (`Dockerfile`, ver a seção Docker do [README da raiz](../README.md#13-docker)). `npm run start` continua funcionando.
+| `npm run dev` | Servidor de desenvolvimento do Next. |
+| `npm run build` | Build de produção (gera também `.next/standalone`, usado pelo Docker). |
+| `npm start` | Serve o build. |
 | `npm run lint` | ESLint com `eslint-config-next`. |
 
-## 2. Variáveis de ambiente
+## Como testar
 
-| Nome | Descrição |
-|------|-----------|
-| `NEXT_PUBLIC_API_URL` | URL base da API (padrão `http://localhost:3001`). Como começa com `NEXT_PUBLIC_`, é embutida no build e incluída no código enviado ao navegador: não coloque segredos aqui. |
-| `API_INTERNAL_URL` | Opcional, só no servidor do Next: URL da API usada por `app/campaigns/[id]/layout.tsx` para montar o título da página. Sem ela, usa `NEXT_PUBLIC_API_URL`. Necessária no Docker, onde `localhost` é o próprio container (`http://backend:3001`). |
+Não há testes automatizados. A verificação é `npm run lint`, `npm run build` (que também checa os tipos) e o uso manual seguindo o [roteiro de demonstração](../README.md#12-roteiro-de-demonstração).
 
-Modelo em `.env.local.example`. O `.env.local` não é versionado.
+## Variáveis de ambiente
 
-## 3. Estrutura de `src/`
+| Variável | Onde é usada | Descrição |
+|----------|--------------|-----------|
+| `NEXT_PUBLIC_API_URL` | `src/lib/api.ts` (navegador) e `src/app/campaigns/[id]/layout.tsx` | URL da API; padrão `http://localhost:3001`. Embutida no build: mudar exige rebuild/redeploy. |
+| `API_INTERNAL_URL` | `src/app/campaigns/[id]/layout.tsx` (servidor do Next) | Opcional. URL da API vista de dentro do servidor do Next; no docker-compose é `http://backend:3001`. Na Vercel não é necessária. |
 
+---
+
+## Estrutura
+
+```text
+frontend/
+├── .env.local.example         Modelo do .env.local.
+├── .dockerignore              Exclui .env*, node_modules e .next da imagem.
+├── .gitignore                 Ignora builds, dependências e .env*.
+├── Dockerfile                 deps → build (recebe NEXT_PUBLIC_API_URL como build arg) → runtime standalone.
+├── next.config.ts             output: "standalone".
+├── package.json               Dependências e scripts.
+├── tsconfig.json              TypeScript; atalho @/ → src/.
+├── eslint.config.mjs          ESLint (eslint-config-next).
+├── postcss.config.mjs         Plugin @tailwindcss/postcss.
+├── AGENTS.md, CLAUDE.md       Instruções para agentes de IA criadas pelo Next.
+├── public/                    SVGs padrão do template (file, globe, next, vercel, window).
+└── src/
+    ├── app/                   Páginas e layouts (App Router)
+    ├── components/            Componentes de interface
+    ├── contexts/              Estado global (sessão e recursos de IA)
+    ├── hooks/                 Hooks reutilizáveis
+    ├── lib/                   Acesso à API e regras/utilitários sem interface
+    └── types/                 Tipos das respostas da API
 ```
-src/
-├── app/            Páginas e layouts (App Router).
-├── components/     Componentes de interface.
-├── contexts/       Estado global: sessão e recursos de IA ligados.
-├── hooks/          Hooks reutilizáveis.
-├── lib/            Acesso à API, regras de formulário, formatação e utilitários.
-└── types/          Tipos das respostas da API.
-```
 
-O alias `@/` aponta para `src/` (ex.: `import { getCampaign } from "@/lib/api"`).
+### `src/app/` (páginas)
 
-### 3.1 Páginas (`src/app/`)
-
-| Arquivo | Rota | Descrição |
+| Arquivo | Rota | Propósito |
 |---------|------|-----------|
-| `layout.tsx` | todas | Layout raiz: fontes, `AuthProvider`, `FeaturesProvider`, `NavigationTracker`, `Navbar`, conteúdo e `ChatWidget`. Metadados: título padrão "Crowdfunding", modelo `%s \| Crowdfunding` e descrição. |
-| `icon.svg`, `apple-icon.png` | — | Ícone do site (quadrado verde `#009966` com coração branco; o PNG 180x180 é gerado a partir do SVG, sem cantos arredondados, porque o iOS aplica a própria máscara). O Next gera as tags `<link rel="icon">` e `apple-touch-icon`. |
-| `globals.css` | — | Tailwind e classes reaproveitadas (`.input`, `.label`, `.card`, `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-ai`, `.btn-ai-secondary`); regra que sobe o botão do chatbot quando há barra de ações fixa. |
-| `page.tsx` | `/` | Lista de campanhas com busca por texto (título e descrição), filtro por categoria e paginação. |
-| `campaigns/[id]/page.tsx` | `/campaigns/:id` | Detalhe: capa, categoria, situação, selo de IA, descrição, progresso, prazo, doação, doadores, "Editar" (dono) e "Compartilhar". |
-| `campaigns/[id]/layout.tsx` | `/campaigns/:id` | Layout de servidor com `generateMetadata`: busca título e descrição na API para a aba e para quem recebe o link (título `absolute`, "<título> \| Crowdfunding", para o modelo do layout raiz não repetir o sufixo). |
-| `campaigns/new/page.tsx` | `/campaigns/new` | Criação (exige login) com o `CampaignForm`. |
-| `campaigns/[id]/edit/page.tsx` | `/campaigns/:id/edit` | Edição (exige login; só o dono vê o formulário), encerrar e excluir. |
-| `login/page.tsx` | `/login` | Entrar; aceita `?email=` (pré-preenche), `?next=` (volta para a página de origem, só caminhos internos) e `?reset=1` (aviso de senha redefinida). |
-| `register/page.tsx` | `/register` | Cadastro; senha de 8 a 72 caracteres; com e-mail já cadastrado, mostra links para "Entrar" e "Esqueci minha senha". |
-| `forgot-password/page.tsx` | `/forgot-password` | Pede o link de redefinição; aceita `?email=`. |
-| `reset-password/page.tsx` | `/reset-password?token=` | Nova senha e confirmação. |
-| `me/page.tsx` | `/me` | "Minha conta" (exige login): abas "Minhas campanhas" e "Minhas doações". |
-| `me/layout.tsx` | `/me` | Metadados da página (componente de servidor). |
+| `layout.tsx` | todas | Layout raiz: metadados padrão ("Crowdfunding", modelo `%s \| Crowdfunding`), `AuthProvider`, `FeaturesProvider`, `Navbar`, `NavigationTracker` e `ChatWidget`. |
+| `globals.css` | — | Tailwind e classes reaproveitadas (botões, campos, cards). |
+| `icon.svg`, `apple-icon.png` | — | Ícone do site (convenção de arquivos do App Router). |
+| `page.tsx` | `/` | Lista de campanhas com busca, filtro por categoria e paginação. |
+| `login/page.tsx` | `/login` | Entrar; volta para `?next=` (só caminhos internos); e-mail pode vir preenchido por `?email=`. |
+| `register/page.tsx` | `/register` | Criar conta (já entra logado). |
+| `forgot-password/page.tsx` | `/forgot-password` | Pede o link de redefinição por e-mail. |
+| `reset-password/page.tsx` | `/reset-password?token=` | Define a nova senha com o token do e-mail. |
+| `campaigns/new/page.tsx` | `/campaigns/new` | Criar campanha (exige login) com o `CampaignForm`. |
+| `campaigns/[id]/layout.tsx` | `/campaigns/:id` | Componente de servidor: `generateMetadata` busca título e descrição na API (limite de 3 s) para a aba e o compartilhamento. |
+| `campaigns/[id]/page.tsx` | `/campaigns/:id` | Detalhe: capa, progresso, prazo, compartilhar, painel de doação e lista de doadores. |
+| `campaigns/[id]/edit/page.tsx` | `/campaigns/:id/edit` | Editar, encerrar ou excluir (só o dono). |
+| `me/layout.tsx` | `/me` | Título da aba "Minha conta". |
+| `me/page.tsx` | `/me` | Abas "Minhas campanhas" e "Minhas doações" (exige login). |
 
-### 3.2 Contextos (`src/contexts/`)
+### `src/components/`
 
-| Arquivo | Descrição |
+| Arquivo | Propósito | Usado por |
+|---------|-----------|-----------|
+| `Navbar.tsx` | Barra superior; links mudam com o login. | `layout.tsx` |
+| `NavigationTracker.tsx` | Mantém a pilha de páginas visitadas (`lib/navigation.ts`). | `layout.tsx` |
+| `BackButton.tsx` | "Voltar" inteligente (pula formulários e login; pergunta se houver alterações não salvas). | páginas |
+| `RequireAuth.tsx` | Redireciona para `/login?next=` quem não está logado. | new, edit, me |
+| `ChatWidget.tsx` | Botão flutuante e janela do chat; só aparece com `aiChat` ligado. | `layout.tsx` |
+| `CampaignCard.tsx` | Card da listagem (link para o detalhe). | `/`, `CampaignPreview`, `MyCampaignsTab` |
+| `CampaignFilters.tsx` | Busca por texto e seletor de categoria. | `/` |
+| `Pagination.tsx` | "Anterior"/"Próxima". | listas |
+| `ProgressBar.tsx` | Barra de progresso (limitada a 100% no visual). | card e detalhe |
+| `StatusBadge.tsx` | Etiqueta "Ativa"/"Encerrada". | card e detalhe |
+| `StatusMessage.tsx` | Mensagens de carregando, erro e lista vazia. | várias |
+| `CampaignForm.tsx` | Formulário de criação/edição com validação por campo e aviso de alterações não salvas. | new, edit |
+| `FormField.tsx` | Moldura do campo: rótulo, ação, erro/dica, contador. | formulários |
+| `MoneyInput.tsx` | Campo em reais com máscara (`lib/money-input.ts`). | `CampaignForm`, `DonationForm` |
+| `DatePicker.tsx` | Data dd/mm/aaaa com calendário em português e navegação por teclado. | `DeadlineInput` |
+| `DeadlineInput.tsx` | Prazo com mínimo de hoje e atalhos 30/60/90 dias. | `CampaignForm` |
+| `CampaignPreview.tsx` | "Como vai aparecer": o card montado com os dados digitados. | `CampaignForm` |
+| `DescriptionAssistant.tsx` | "Melhorar descrição com IA" com comparação e "Usar este texto". | `CampaignForm` |
+| `CategorySuggestion.tsx` | "Sugerir categoria". | `CampaignForm` |
+| `CoverPicker.tsx` | Abas de origem da capa e área de pré-visualização. | `CampaignForm` |
+| `ImageDropzone.tsx` | Área 16:9 com clique e arrastar e soltar. | `CoverPicker` |
+| `ImageField.tsx` | Aba "Colar URL". | `CoverPicker` |
+| `AiCoverGenerator.tsx` | "Gerar capa com IA": usar, gerar outra ou descartar. | `CoverPicker` |
+| `CoverImage.tsx` | Mostra a capa inteira em 16:9 com fundo desfocado; placeholder se falhar. | card, detalhe, formulário |
+| `AiBadge.tsx` | Selo "Capa gerada por IA". | card e detalhe |
+| `ShareButton.tsx` | Web Share API ou cópia do link. | detalhe |
+| `DonationPanel.tsx` | Decide se mostra o formulário de doação ou o motivo (dono, encerrada, sem login). | detalhe |
+| `DonationForm.tsx` | Valor e mensagem da doação simulada. | `DonationPanel` |
+| `DonorList.tsx` | Lista paginada de doadores. | detalhe |
+| `PasswordInput.tsx` | Campo de senha com botão de olho. | login, register, reset |
+| `MyCampaignsTab.tsx` | Aba "Minhas campanhas" (ver, editar, encerrar). | `/me` |
+| `MyDonationsTab.tsx` | Aba "Minhas doações". | `/me` |
+
+### `src/contexts/`, `src/hooks/`, `src/lib/`, `src/types/`
+
+| Arquivo | Propósito |
 |---------|-----------|
-| `AuthContext.tsx` | `AuthProvider` e `useAuth()`: usuário, token, `ready` (sessão já lida), `login`, `register` e `logout`. Restaura a sessão do `localStorage` e encerra a sessão quando a API recusa o token (evento disparado por `lib/api.ts`). |
-| `FeaturesContext.tsx` | `FeaturesProvider` e `useFeatures()`: consulta `GET /config/features` uma vez ao abrir o site. Começa com tudo desligado (também em caso de erro) e controla a exibição da aba "Gerar com IA", dos botões de escrita por IA e do chatbot. |
+| `contexts/AuthContext.tsx` | Usuário logado, login/logout; restaura a sessão do `localStorage` e reage ao evento de sessão expirada. |
+| `contexts/FeaturesContext.tsx` | Lê `GET /config/features` uma vez; enquanto carrega ou se falhar, tudo de IA fica desligado. |
+| `hooks/useImageUpload.ts` | Checagem rápida do arquivo (tipo e 5 MB) e envio para `/uploads/campaign-image`. |
+| `hooks/useUnsavedChangesWarning.ts` | Confirmação ao sair com alterações não salvas (`beforeunload` e navegação interna). |
+| `lib/api.ts` | **Única porta para a API**: URL base, JSON/FormData, token Bearer, `ApiError` e uma função por endpoint (`login`, `getCampaigns`, `createDonation`, `generateAiCover`, `sendChatMessage`...). |
+| `lib/session.ts` | Guarda usuário + token no `localStorage` (trade-off de segurança documentado no arquivo). |
+| `lib/campaign-rules.ts` | Limites do formulário iguais aos do zod do backend. |
+| `lib/password-rules.ts` | Regra de senha (8 a 72) igual à do backend. |
+| `lib/date-input.ts` | Datas "AAAA-MM-DD" e "hoje" em America/Sao_Paulo (espelho de `backend/src/lib/dates.ts`). |
+| `lib/money-input.ts` | Máscara brasileira de dinheiro (dígitos como centavos). |
+| `lib/format.ts` | Formatação para exibição (R$, datas, dias restantes). |
+| `lib/email-param.ts` | Valida o e-mail passado por `?email=`. |
+| `lib/navigation.ts` | Pilha de páginas visitadas para o botão "Voltar". |
+| `lib/unsaved-changes.ts` | Marca global de "há alterações não salvas". |
+| `types/*.ts` | `campaign`, `category`, `chat`, `donation`, `features`, `pagination`, `user`: formatos das respostas e entradas da API. |
 
-### 3.3 Componentes (`src/components/`)
+## Como as partes se conectam
 
-**Formulário de campanha**
+- **Página → `lib/api.ts` → backend:** nenhuma página chama `fetch` direto para a API; todas usam as funções de `lib/api.ts`, que lê `NEXT_PUBLIC_API_URL`, anexa o token de `lib/session.ts` e transforma `{ error }` em `ApiError` (mostrada com `errorMessage`). Um 401 com sessão aberta limpa a sessão e avisa o `AuthContext`.
+- **Layout raiz:** `AuthProvider` e `FeaturesProvider` envolvem todas as páginas, então qualquer componente sabe quem está logado e quais recursos de IA existem. O `ChatWidget` e os botões de IA do formulário só aparecem quando o recurso correspondente está ligado.
+- **Regras espelhadas:** `campaign-rules.ts`, `password-rules.ts` e `date-input.ts` repetem as regras do backend para mostrar o erro antes de enviar; o backend valida de novo.
+- **Metadados:** `campaigns/[id]/layout.tsx` roda no servidor do Next e busca a campanha na API (`API_INTERNAL_URL` ou `NEXT_PUBLIC_API_URL`) para o título e a descrição da página.
 
-| Componente | Descrição |
-|------------|-----------|
-| `CampaignForm.tsx` | Formulário compartilhado por criação e edição: validação por campo (só depois de sair do campo ou tentar enviar), contadores, barra de ações fixa ("Cancelar" e "Criar campanha"/"Salvar alterações"), aviso de alterações não salvas e pré-visualização. |
-| `FormField.tsx` | Moldura do campo: rótulo, ação opcional, mensagem de erro ou dica e contador de caracteres. |
-| `MoneyInput.tsx` | Meta com prefixo "R$" e máscara brasileira (`lib/money-input.ts`). |
-| `DeadlineInput.tsx` | Prazo: `DatePicker` com mínimo de amanhã e atalhos de 30, 60 e 90 dias (o atalho da data escolhida fica destacado). |
-| `DatePicker.tsx` | Calendário próprio em português: digitação dd/mm/aaaa com máscara, popover com navegação por mês e ano, dia atual destacado, dias antes do mínimo desabilitados, teclado (setas, PageUp/PageDown, Home/End, Enter, Esc), fecha ao clicar fora e não ultrapassa a borda da tela. |
-| `CoverPicker.tsx` | Bloco da capa: abas "Enviar arquivo", "Gerar com IA" (só se ligada) e "Colar URL", com uma única área de pré-visualização. |
-| `ImageDropzone.tsx` | Área 16:9 tracejada: arrastar e soltar ou clicar para escolher; selo e borda roxos na aba de IA; botão "Remover imagem". |
-| `ImageField.tsx` | Aba "Colar URL". |
-| `AiCoverGenerator.tsx` | "Gerar capa com IA": gerar, usar, gerar outra ou descartar a sugestão. |
-| `DescriptionAssistant.tsx` | "Melhorar descrição com IA": mostra o texto original e a sugestão lado a lado; só troca com "Usar este texto". |
-| `CategorySuggestion.tsx` | "Sugerir categoria": seleciona a categoria sugerida e mostra "Sugerida por IA. Você pode alterar." |
-| `CampaignPreview.tsx` | "Como vai aparecer": o mesmo `CampaignCard` com os dados digitados (arrecadado = 0; "de R$ —" com a meta vazia). |
+## Convenções
 
-Os botões de IA mostram, só quando desabilitados, uma frase curta com o que falta (título e/ou descrição).
-
-**Campanhas e doações**
-
-| Componente | Descrição |
-|------------|-----------|
-| `CampaignCard.tsx` | Card da listagem (imagem 16:9, categoria, situação, título, progresso, valores e prazo); pode ser link ou só visual. |
-| `CampaignFilters.tsx` | Campo de busca por texto e filtro de categoria. |
-| `CoverImage.tsx` | Capa sempre em 16:9 e inteira: imagem com `object-contain` sobre um fundo com a mesma imagem ampliada e desfocada; `<img>` comum (aceita qualquer domínio); se falhar ao carregar, mostra "Sem imagem". Selo de IA opcional. |
-| `ProgressBar.tsx` | Barra de progresso (pode passar de 100%). |
-| `StatusBadge.tsx` | Etiqueta "Ativa" / "Encerrada". |
-| `AiBadge.tsx` | Selo "Capa gerada por IA". |
-| `DonationPanel.tsx` | Decide se mostra o formulário de doação ou o motivo de não mostrar (não logado, dono, encerrada). |
-| `DonationForm.tsx` | Valor e mensagem da doação simulada. |
-| `DonorList.tsx` | Lista paginada de doadores. |
-| `ShareButton.tsx` | "Compartilhar": Web Share API ou cópia do link com "Link copiado!". |
-| `MyCampaignsTab.tsx` | Aba "Minhas campanhas": cards com Ver, Editar e Encerrar (com confirmação). |
-| `MyDonationsTab.tsx` | Aba "Minhas doações": campanha, valor, mensagem e data. |
-
-**Navegação, sessão e estrutura**
-
-| Componente | Descrição |
-|------------|-----------|
-| `Navbar.tsx` | Barra superior; logado: "Minha conta", "Nova campanha" e "Sair"; visitante: "Entrar" e "Criar conta". |
-| `BackButton.tsx` | Seta "Voltar" (acima do título das páginas internas): volta no histórico se veio de outra página do site; senão, vai para um endereço de reserva. |
-| `NavigationTracker.tsx` | No layout, registra navegações internas que criam entrada no histórico (redirecionamentos com `replace` não contam). |
-| `RequireAuth.tsx` | Protege páginas: sem login, redireciona para `/login?next=...`. |
-| `PasswordInput.tsx` | Campo de senha com botão de olho (`aria-label` e `aria-pressed`), mantendo o `autoComplete` de cada tela. |
-| `Pagination.tsx` | Botões "Anterior" / "Próxima". |
-| `StatusMessage.tsx` | Mensagens padrão de carregamento, erro e lista vazia. |
-| `ChatWidget.tsx` | Botão flutuante "Precisa de ajuda?" e janela do chatbot (só quando o chat está ligado); histórico em memória, respostas em texto puro. |
-
-### 3.4 Hooks (`src/hooks/`)
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `useImageUpload.ts` | Validação no navegador (JPEG, PNG ou WebP, até 5 MB) e envio da capa; usado pelo `CoverPicker`. O backend valida de novo pelos bytes. |
-| `useUnsavedChangesWarning.ts` | Pede confirmação ao sair com alterações não salvas: fechar/recarregar a aba, clicar em links do site, "Voltar" e "Cancelar". O botão "voltar" do navegador não pode ser bloqueado de forma confiável. |
-
-### 3.5 Bibliotecas (`src/lib/`)
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `api.ts` | Único ponto de acesso à API: `request()` monta a URL, envia JSON ou `FormData`, anexa o token, converte `{ error }` em `ApiError` e, em 401 por token recusado, encerra a sessão ("Sua sessão expirou. Entre novamente."). Exporta uma função por endpoint. |
-| `session.ts` | Lê, grava e apaga a sessão (usuário + token) no `localStorage`; o comentário do arquivo explica o trade-off de segurança. |
-| `campaign-rules.ts` | Mesmos limites do backend (título 3 a 120, descrição 10 a 5000, meta de R$ 0,01 a R$ 9.999.999.999,99, prazo a partir de hoje em Brasília, categoria obrigatória) e a dica do que falta para usar a IA. |
-| `password-rules.ts` | Regra de senha (8 a 72 caracteres) com a mesma mensagem do backend. |
-| `money-input.ts` | Máscara de dinheiro (dígitos viram centavos) e conversão para o formato da API (`"5000.00"`) e de volta. |
-| `date-input.ts` | Datas no formato `AAAA-MM-DD` (enviadas assim à API), "hoje" e atalhos de prazo sempre no fuso America/Sao_Paulo (`todayInSaoPaulo`, `daysFromToday`, `diffCalendarDays`, mesma regra de `backend/src/lib/dates.ts`), formato dd/mm/aaaa, máscara de digitação e utilitários do calendário. |
-| `format.ts` | Moeda (R$), datas (prazo no fuso de Brasília) e o texto do prazo a partir de `daysLeft`/`expired` do backend ("N dias restantes", "1 dia restante", "Último dia", "Prazo encerrado"). |
-| `email-param.ts` | E-mail passado pela URL (`?email=`): só aceita formato de e-mail. |
-| `navigation.ts` | Marca na `sessionStorage` se houve navegação interna (usada pelo `BackButton`). |
-| `unsaved-changes.ts` | Registro de "há alterações não salvas", consultado por "Voltar" e "Cancelar". |
-
-### 3.6 Tipos (`src/types/`)
-
-`campaign.ts` (campanha, detalhe, filtros, entrada de criação/edição, itens de "Minhas campanhas"), `category.ts`, `donation.ts` (doação da campanha, entrada e itens de "Minhas doações"), `user.ts` (usuário e resposta de login), `chat.ts`, `features.ts` e `pagination.ts` (`{ data, meta }`). Valores monetários chegam como string com 2 casas.
-
-## 4. Convenções
-
-- Toda chamada à API passa por `lib/api.ts`; componentes não usam `fetch` direto (exceção: `campaigns/[id]/layout.tsx`, que roda no servidor para os metadados).
-- Textos da interface em português.
-- Recursos de IA aparecem só quando `useFeatures()` indica que estão ligados; sem eles, a busca por texto e o formulário funcionam normalmente.
-- Imagens de campanha (inclusive SVG gerado por IA) são exibidas sempre com `<img>`, nunca como HTML.
-- Acessibilidade: rótulos associados aos campos, mensagens de erro ligadas por `aria-describedby`, foco visível e navegação por teclado no calendário e nas abas.
+- Dinheiro chega da API como string (`"150.50"`) e é enviado como string com até 2 casas.
+- Prazo é enviado como `"AAAA-MM-DD"`; os dias restantes exibidos vêm do backend (`daysLeft`/`expired`), exceto na pré-visualização, que usa a mesma regra localmente.
+- Imagens de capa sempre com `<img>` comum (aceita qualquer domínio sem configurar `next/image` e não executa scripts de SVG).
