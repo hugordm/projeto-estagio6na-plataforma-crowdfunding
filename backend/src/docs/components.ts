@@ -97,24 +97,6 @@ export const schemas: Record<string, JsonSchema> = {
     required: ['data', 'meta'],
     properties: { data: { type: 'array', items: { $ref: '#/components/schemas/CampaignDetail' } }, meta: { $ref: '#/components/schemas/PaginationMeta' } },
   },
-  CampaignSearchResult: {
-    type: 'object',
-    required: ['data', 'meta', 'mode'],
-    properties: {
-      data: {
-        type: 'array',
-        items: {
-          allOf: [
-            { $ref: '#/components/schemas/Campaign' },
-            { type: 'object', properties: { similarity: { type: 'number', description: 'Só na busca semântica (0 a 1).', example: 0.52 } } },
-          ],
-        },
-      },
-      meta: { $ref: '#/components/schemas/PaginationMeta' },
-      mode: { type: 'string', enum: ['semantic', 'text'], description: '"text" quando a busca semântica não está disponível.', example: 'text' },
-      notice: { type: 'string', example: 'A busca inteligente está indisponível no momento. Mostrando resultados da busca por texto.' },
-    },
-  },
   Donation: {
     type: 'object',
     properties: {
@@ -180,9 +162,8 @@ export const schemas: Record<string, JsonSchema> = {
   },
   Features: {
     type: 'object',
-    required: ['semanticSearch', 'aiCover', 'aiChat', 'aiWriting'],
+    required: ['aiCover', 'aiChat', 'aiWriting'],
     properties: {
-      semanticSearch: { type: 'boolean', description: '"Busca inteligente" (embeddings).', example: false },
       aiCover: { type: 'boolean', description: 'Capa gerada por IA.', example: true },
       aiChat: { type: 'boolean', description: 'Chatbot de suporte.', example: true },
       aiWriting: { type: 'boolean', description: '"Melhorar descrição com IA" e "Sugerir categoria".', example: true },

@@ -3,7 +3,6 @@ import { prisma } from '../lib/prisma';
 import { HttpError } from '../lib/http-error';
 import { calcProgress, formatMoney } from '../lib/money';
 import { buildMeta, type Pagination } from '../lib/pagination';
-import { scheduleCampaignEmbedding } from './embedding.service';
 import { isAiGeneratedImage } from './ai-usage.service';
 import { deleteImage } from './storage.service';
 import { diffCalendarDays, isDeadlineOver } from '../lib/dates';
@@ -162,7 +161,6 @@ export async function createCampaign(ownerId: number, data: CreateCampaignData) 
   // A etiqueta "Capa gerada por IA" é decidida aqui, pela URL, e não pelo cliente.
   const imageGeneratedByAi = await isAiGeneratedImage(data.imageUrl);
   const campaign = await prisma.campaign.create({ data: { ...data, imageGeneratedByAi, ownerId } });
-  scheduleCampaignEmbedding(campaign.id); // em segundo plano, não atrasa a resposta
   return getCampaign(campaign.id);
 }
 
@@ -180,10 +178,6 @@ export async function updateCampaign(id: number, userId: number, data: UpdateCam
   const imageGeneratedByAi = data.imageUrl !== undefined ? await isAiGeneratedImage(data.imageUrl) : undefined;
   await prisma.campaign.update({ where: { id }, data: { ...data, imageGeneratedByAi } });
   if (data.imageUrl !== undefined && data.imageUrl !== current.imageUrl) await discardImage(current.imageUrl);
-  // Só refaz o embedding se mudou algo do texto que ele representa.
-  if (data.title !== undefined || data.description !== undefined || data.categoryId !== undefined) {
-    scheduleCampaignEmbedding(id);
-  }
   return getCampaign(id);
 }
 

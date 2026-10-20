@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/auth';
-import { aiImageLimiter, aiTextLimiter, semanticSearchLimiter } from '../middlewares/rate-limit';
+import { aiImageLimiter, aiTextLimiter, searchLimiter } from '../middlewares/rate-limit';
 import * as campaignController from '../controllers/campaign.controller';
 import * as donationController from '../controllers/donation.controller';
 import * as aiCoverController from '../controllers/ai-cover.controller';
@@ -10,7 +10,7 @@ export const campaignRoutes = Router();
 
 campaignRoutes.get('/', campaignController.list);
 // Precisa vir antes de '/:id', senão "search" seria tratado como um id.
-campaignRoutes.get('/search', semanticSearchLimiter, campaignController.search);
+campaignRoutes.get('/search', searchLimiter, campaignController.search);
 campaignRoutes.get('/:id', campaignController.getById);
 campaignRoutes.post('/', requireAuth, campaignController.create);
 campaignRoutes.post('/ai-cover', requireAuth, aiImageLimiter, aiCoverController.create);

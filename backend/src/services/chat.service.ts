@@ -13,7 +13,7 @@ const SUMMARY_CHARS = 160;
 
 // Instruções do assistente. Tudo o que ele sabe sobre a plataforma está aqui (e nas campanhas
 // relacionadas, quando houver), para não inventar funcionalidades. As linhas sobre recursos de IA
-// (capa, ajuda para escrever, busca inteligente) só entram quando o recurso está ligado no servidor
+// (capa e ajuda para escrever) só entram quando o recurso está ligado no servidor
 // (getFeatures()): assim o chat nunca descreve um botão que a pessoa não vai encontrar na tela.
 export function buildSystemPrompt(features: Features): string {
   const coverOptions = features.aiCover
@@ -22,9 +22,6 @@ export function buildSystemPrompt(features: Features): string {
   const writingHelp = features.aiWriting
     ? '\n- Ajuda para escrever: no formulário da campanha, "Melhorar descrição com IA" sugere uma versão mais clara da descrição (o texto só muda se a pessoa clicar em "Usar este texto") e "Sugerir categoria" escolhe uma categoria, que pode ser trocada.'
     : '';
-  const search = features.semanticSearch
-    ? 'busca por texto, filtro por categoria e a opção "Busca inteligente", que entende o significado da pergunta.'
-    : 'busca por texto e filtro por categoria.';
 
   return `Você é o assistente de suporte de uma plataforma brasileira de crowdfunding (vaquinhas online).
 Responda sempre em português do Brasil, de forma curta (no máximo 5 frases), cordial e objetiva.
@@ -39,7 +36,7 @@ COMO A PLATAFORMA FUNCIONA (use apenas estas informações):
 - Editar ou encerrar: só o dono da campanha, pelo botão "Editar campanha" na página dela. Campanha que já recebeu doações não pode ser excluída, apenas encerrada.
 - Doar: abra a campanha e use o quadro "Apoiar esta campanha", com o valor e uma mensagem opcional. É preciso estar logado.
 - Regras de doação: a doação é simulada (não há pagamento real nem cobrança, e a plataforma não pede dados de cartão). O dono não pode doar para a própria campanha. Campanha encerrada ou com prazo vencido não recebe doações. A meta pode ser ultrapassada.
-- Encontrar campanhas: a página inicial tem ${search}
+- Encontrar campanhas: a página inicial tem busca por texto e filtro por categoria.
 
 REGRAS:
 - Não invente funcionalidades, valores, prazos, contatos ou políticas que não estejam acima. Se não souber, diga que não tem essa informação.
@@ -115,7 +112,7 @@ export async function answer(history: ChatMessage[]): Promise<string> {
   messages.push(...recent);
 
   try {
-    const reply = await chat(messages, { maxTokens: 400, temperature: 0.3 });
+    const reply = await chat(messages, { maxTokens: 400 });
     return toPlainText(reply);
   } catch (error) {
     if (error instanceof AiError) {

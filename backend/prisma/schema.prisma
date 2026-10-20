@@ -54,9 +54,10 @@ model Campaign {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
-  // Embedding (pgvector) de "título + descrição + categoria", usado na busca semântica.
-  // 1024 = dimensão do modelo baai/bge-m3. O Prisma Client não lê este tipo: usamos SQL bruto.
-  // O índice HNSW (vector_cosine_ops) é criado na migration, pois o Prisma não tem esse tipo de índice.
+  // SEM USO: coluna (pgvector) da antiga busca semântica, removida do escopo. Fica no banco para não
+  // exigir uma migration destrutiva; pode ser apagada (com o índice e, se quiser, a extensão vector)
+  // por uma migration futura. O Prisma Client não lê este tipo e o código não a consulta.
+  // O índice HNSW (vector_cosine_ops) foi criado na migration, pois o Prisma não tem esse tipo de índice.
   // ATENÇÃO: o Prisma não "enxerga" esse índice e tenta apagá-lo nas próximas migrations. Crie migrations
   // com --create-only e remova a linha DROP INDEX "Campaign_embedding_hnsw_idx" antes de aplicar.
   embedding Unsupported("vector(1024)")?

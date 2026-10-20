@@ -69,8 +69,18 @@ export const uploadLimiter = rateLimit({
   message: limitMessage('Limite de envios de imagem atingido. Tente novamente mais tarde.'),
 });
 
+// Busca por texto (GET /campaigns/search): 30 buscas por minuto por usuário/IP.
+export const searchLimiter = rateLimit({
+  windowMs: MINUTE,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: userOrIp,
+  message: limitMessage('Muitas buscas em pouco tempo. Aguarde um minuto e tente novamente.'),
+});
+
 // ---------- Rotas de IA ----------
-// Protegem o custo do OpenRouter contra abuso. Complementam o limite diário de imagens
+// Protegem o custo da Anthropic contra abuso. Complementam o limite diário de imagens
 // (tabela AiImageGeneration), que é persistente; estes contadores são de curto prazo.
 
 // Chatbot: 15 mensagens por minuto por usuário (ou IP, sem login).
@@ -81,16 +91,6 @@ export const chatLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: userOrIp,
   message: limitMessage('Muitas mensagens em pouco tempo. Aguarde um minuto e tente novamente.'),
-});
-
-// Busca inteligente: 30 buscas por minuto por usuário/IP (cada busca gera um embedding).
-export const semanticSearchLimiter = rateLimit({
-  windowMs: MINUTE,
-  limit: 30,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  keyGenerator: userOrIp,
-  message: limitMessage('Muitas buscas em pouco tempo. Aguarde um minuto e tente novamente.'),
 });
 
 // Geração de capa: no máximo 3 pedidos a cada 10 minutos (evita cliques repetidos em sequência).

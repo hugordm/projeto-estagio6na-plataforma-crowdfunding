@@ -7,9 +7,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../src/lib/prisma';
 import { addCalendarDays, endOfDeadlineDay, todayInSaoPaulo } from '../src/lib/dates';
-import { isAiConfigured } from '../src/lib/openrouter';
 import { BCRYPT_COST } from '../src/services/auth.service';
-import { updateCampaignEmbedding } from '../src/services/embedding.service';
 
 // Senha conhecida, documentada no README. Só para demonstração local.
 const DEMO_PASSWORD = 'demo1234';
@@ -145,21 +143,6 @@ async function seed() {
   console.log(`Demonstração pronta: ${users.length} usuários e ${campaignIds.length} campanhas.`);
   console.log(`Login: ${demoEmails.join(' ou ')} | senha: ${DEMO_PASSWORD}`);
 
-  if (!isAiConfigured('embedding')) {
-    console.warn('Aviso: embeddings do OpenRouter não configurados; as campanhas de demonstração não aparecerão na busca inteligente.');
-    console.warn('Quando configurar, rode: npx tsx scripts/backfill-embeddings.ts');
-    return;
-  }
-  let ok = 0;
-  for (const id of campaignIds) {
-    try {
-      await updateCampaignEmbedding(id);
-      ok++;
-    } catch (error) {
-      console.warn(`Aviso: embedding da campanha ${id} não gerado (${error instanceof Error ? error.message : error}).`);
-    }
-  }
-  console.log(`Embeddings gerados: ${ok}/${campaignIds.length}.`);
 }
 
 // Apaga os usuários de demonstração, as campanhas deles (com todas as doações recebidas, sem as quais

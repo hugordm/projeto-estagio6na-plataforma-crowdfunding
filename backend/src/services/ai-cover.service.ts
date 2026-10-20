@@ -1,52 +1,31 @@
 import { HttpError } from '../lib/http-error';
 import { AiError } from '../lib/ai-types';
-import { detectImageType, GENERATED_SVG } from '../lib/image-type';
+import { GENERATED_SVG } from '../lib/image-type';
 import { isAnthropicConfigured } from '../lib/anthropic';
-import { generateImage, isAiConfigured, OpenRouterError } from '../lib/openrouter';
 import { completeImageGeneration, releaseImageGeneration, reserveImageGeneration } from './ai-usage.service';
 import { saveImage } from './storage.service';
 import { generateSvgCover } from './svg-cover.service';
 
 export type CoverInput = { title: string; description: string; categoryName: string };
 
-// COVER_PROVIDER=openrouter (padrão): imagem (PNG/JPEG/WebP) pelo modelo OPENROUTER_IMAGE_MODEL.
-// COVER_PROVIDER=anthropic-svg: ilustração vetorial (SVG) escrita pelo Claude e sanitizada.
-export type CoverProvider = 'openrouter' | 'anthropic-svg';
+// COVER_PROVIDER=anthropic-svg (padrão): ilustração vetorial (SVG) escrita pelo Claude e sanitizada.
+// Qualquer outro valor (ex.: o de um provedor antigo) deixa a capa por IA desligada, com aviso no log
+// ao iniciar (features.service.ts).
+export type CoverProvider = 'anthropic-svg';
 
-export function coverProvider(): CoverProvider {
-  return process.env.COVER_PROVIDER === 'anthropic-svg' ? 'anthropic-svg' : 'openrouter';
+// null quando COVER_PROVIDER tem um valor não suportado.
+export function coverProvider(): CoverProvider | null {
+  const value = process.env.COVER_PROVIDER?.trim();
+  return !value || value === 'anthropic-svg' ? 'anthropic-svg' : null;
 }
 
-// Capa por IA disponível? anthropic-svg: chave da Anthropic (o modelo tem padrão, ANTHROPIC_COVER_MODEL
-// ou claude-sonnet-5-5); openrouter: chave do OpenRouter e OPENROUTER_IMAGE_MODEL.
+// Capa por IA disponível? Provedor válido e chave da Anthropic (o modelo tem padrão,
+// ANTHROPIC_COVER_MODEL ou claude-sonnet-5-5).
 export function isCoverConfigured(): boolean {
-  return coverProvider() === 'anthropic-svg' ? isAnthropicConfigured() : isAiConfigured('image');
+  return coverProvider() !== null && isAnthropicConfigured();
 }
 
-const MAX_DESCRIPTION_CHARS = 600;
-
-// O prompt é montado SÓ no backend, com regras fixas; o usuário fornece apenas os dados da campanha.
-// Fica em inglês porque os modelos de imagem seguem melhor instruções em inglês.
-export function buildCoverPrompt({ title, description, categoryName }: CoverInput): string {
-  const context = description.replace(/\s+/g, ' ').slice(0, MAX_DESCRIPTION_CHARS);
-  return [
-    'Flat, colorful editorial illustration to be used as the cover image of a crowdfunding campaign.',
-    `Category: ${categoryName}. Campaign title (Portuguese): "${title}". Campaign summary (Portuguese): "${context}".`,
-    'Style: friendly and optimistic illustration, soft colors, clean shapes, simple composition, wide 16:9 framing.',
-    'Strict rules: absolutely no text, letters, numbers, captions, logos or watermarks anywhere in the image.',
-    'Do not depict real or famous people; if people appear, they must be generic, stylized characters.',
-  ].join('\n');
-}
-
-// Imagem pelo OpenRouter: confere pelos bytes que é mesmo JPEG/PNG/WebP antes de salvar.
-async function generateImageCover(input: CoverInput): Promise<string> {
-  const image = await generateImage(buildCoverPrompt(input), { aspectRatio: '16:9' });
-  const type = detectImageType(image.content);
-  if (!type) throw new OpenRouterError('bad_response', `Imagem em formato inesperado (${image.mediaType})`);
-  return saveImage(image.content, type);
-}
-
-// SVG pela Anthropic: o svg-cover.service já devolve o código sanitizado.
+// SVG pela Anthropic: o svg-cover.service já devolve o código sanitizado (lista permitida).
 async function generateVectorCover(input: CoverInput): Promise<string> {
   const svg = await generateSvgCover(input);
   return saveImage(Buffer.from(svg, 'utf8'), GENERATED_SVG);
@@ -65,16 +44,18 @@ function friendlyError(error: AiError): HttpError {
 
 // Gera a capa, salva pelo storage (mesmo lugar dos uploads) e devolve a URL pública.
 export async function generateCover(userId: number, input: CoverInput): Promise<string> {
+  // Antes de reservar o limite: provedor inválido (COVER_PROVIDER antigo) ou sem chave.
+  if (!isCoverConfigured()) throw friendlyError(new AiError('not_configured', 'Capa por IA desligada'));
   const reservationId = await reserveImageGeneration(userId); // 429 se passou do limite diário
 
   try {
-    const url = coverProvider() === 'anthropic-svg' ? await generateVectorCover(input) : await generateImageCover(input);
+    const url = await generateVectorCover(input);
     await completeImageGeneration(reservationId, url); // é por esta URL que o backend reconhece a capa de IA
     return url;
   } catch (error) {
     await releaseImageGeneration(reservationId); // falha não consome o limite do usuário
     if (error instanceof AiError) {
-      console.error(`[capa IA] [${coverProvider()}] [${error.kind}] ${error.message}`);
+      console.error(`[capa IA] [${coverProvider() ?? 'desligado'}] [${error.kind}] ${error.message}`);
       throw friendlyError(error);
     }
     throw error;

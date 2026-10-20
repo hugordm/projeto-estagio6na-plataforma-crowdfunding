@@ -12,6 +12,7 @@ import { meRoutes } from './routes/me.routes';
 import { configRoutes } from './routes/config.routes';
 import { docsEnabled, docsRoutes, warnDocsConfig } from './routes/docs.routes';
 import { UPLOADS_DIR, UPLOADS_ROUTE, warnStorageConfig } from './services/storage.service';
+import { warnAiConfig } from './services/features.service';
 import { errorHandler, notFoundHandler } from './middlewares/error';
 
 // Prefixo de cada grupo de rotas. Também usado por scripts/docs-check.ts para conferir
@@ -58,6 +59,7 @@ if (docsEnabled()) {
 }
 
 warnStorageConfig();
+warnAiConfig();
 
 // Arquivos enviados e capas geradas (provedor local; continua servindo os antigos com STORAGE_PROVIDER=cloudinary). nosniff impede o navegador de "adivinhar" outro tipo de conteúdo.
 // Para SVG (capas da IA), uma CSP restritiva: mesmo aberto direto no navegador, o arquivo não pode

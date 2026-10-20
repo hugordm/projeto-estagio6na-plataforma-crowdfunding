@@ -1,11 +1,10 @@
-// Contrato comum dos provedores de IA (OpenRouter e Anthropic): formato das mensagens,
+// Contrato dos provedores de IA (hoje só a Anthropic): formato das mensagens,
 // opções de chat e o erro tipado que o resto do código usa para decidir o que mostrar.
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
 export type ChatOptions = {
   maxTokens?: number; // tamanho máximo da resposta
-  temperature?: number; // usado só pelo OpenRouter (o Claude Haiku 5.5 rejeita valores fora do padrão)
   model?: string; // sobrescreve o modelo padrão do provedor
 };
 

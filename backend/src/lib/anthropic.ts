@@ -1,9 +1,9 @@
 /*
  * Cliente da Anthropic (Claude), com o SDK oficial @anthropic-ai/sdk.
- * - chat(): mesma assinatura do openrouter.chat() (mensagens + opções -> texto), modelo
+ * - chat(): mensagens + opções -> texto (assinatura usada por llm.ts), modelo
  *   ANTHROPIC_CHAT_MODEL (padrão claude-haiku-5-5).
  * - generateLongText(): respostas longas (ex.: o código SVG da capa), por streaming e com prazo maior.
- * Toda falha vira AnthropicError (um AiError, ver ai-types.ts) com o mesmo "kind" do OpenRouter.
+ * Toda falha vira AnthropicError (um AiError, ver ai-types.ts), com um "kind" que os serviços traduzem em mensagens amigáveis.
  * A chave (ANTHROPIC_API_KEY) nunca é registrada em log.
  */
 
@@ -34,7 +34,7 @@ export function isAnthropicConfigured(): boolean {
 }
 
 // Cliente criado a cada uso (barato): assim a chave é lida do ambiente na hora.
-// maxRetries: 0 porque a nova tentativa é feita por withRetry(), com a mesma regra do OpenRouter.
+// maxRetries: 0 porque a nova tentativa é feita por withRetry().
 export function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new AnthropicError('not_configured', 'ANTHROPIC_API_KEY não definido no ambiente');

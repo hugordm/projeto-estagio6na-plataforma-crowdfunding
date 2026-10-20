@@ -159,15 +159,15 @@ const paths = {
   '/campaigns/search': {
     get: {
       tags: ['Campanhas'],
-      summary: 'Busca inteligente (semântica)',
-      description: 'Busca por significado com embeddings. Se a busca semântica não estiver configurada ou falhar, usa a busca por texto e avisa em "notice" (mode = "text"). Rate limit: 30 por minuto.',
+      summary: 'Busca por texto',
+      description: 'Procura o texto no título e na descrição (a mesma busca da listagem com ?q=), com filtro opcional de categoria. Mesmo formato da listagem. Rate limit: 30 por minuto.',
       parameters: zodQueryParameters(searchQuerySchema, {
         q: 'Texto da busca (2 a 200 caracteres).',
         category: 'Id ou nome da categoria.',
         page: 'Página.',
         limit: 'Itens por página (máximo 50).',
       }),
-      responses: { '200': ok('Resultados.', ref('CampaignSearchResult')), ...errors('BadRequest', 'TooManyRequests') },
+      responses: { '200': ok('Resultados.', ref('CampaignPage')), ...errors('BadRequest', 'TooManyRequests') },
     },
   },
   '/campaigns/{id}': {
@@ -225,7 +225,7 @@ const paths = {
     post: {
       tags: ['IA'],
       summary: 'Gera uma capa com IA',
-      description: 'Ilustração 16:9 (SVG ou imagem, conforme o provedor do servidor). Limites: 3 pedidos a cada 10 minutos e 5 capas por usuário a cada 24 h. Falha não consome o limite.',
+      description: 'Ilustração 16:9 em SVG desenhada pelo Claude (Anthropic) e sanitizada por lista permitida antes de ser salva. Limites: 3 pedidos a cada 10 minutos e 5 capas por usuário a cada 24 h. Falha não consome o limite.',
       security: bearer,
       requestBody: jsonBody(zodBody(aiCoverSchema, { example: { title: 'Horta comunitária na praça', description: 'Canteiros elevados, composteira e oficinas para vizinhos aos sábados.', categoryId: 6 } })),
       responses: { '201': ok('Capa gerada.', ref('Url')), ...errors('BadRequest', 'Unauthorized', 'TooManyRequests', 'AiRejected', 'AiBadResponse', 'AiUnavailable') },

@@ -65,7 +65,7 @@ export const searchQuerySchema = paginationSchema.extend({
   category: z.string().trim().optional(),
 });
 
-// GET /campaigns/search?q=...: busca semântica (com fallback para busca textual).
+// GET /campaigns/search?q=...: busca por texto (título e descrição), com filtro opcional de categoria.
 export async function search(req: Request, res: Response) {
   const filters = searchQuerySchema.parse(req.query);
   res.json(await searchService.searchCampaigns(filters));

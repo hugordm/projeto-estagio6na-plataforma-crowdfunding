@@ -3,7 +3,7 @@
  *
  * Usamos só três chamadas: upload e destroy (Upload API, assinadas com SHA-1 do segredo) e a listagem
  * de recursos (Admin API, HTTP Basic), esta só no script de limpeza. Sem o SDK oficial: o projeto já
- * fala com OpenRouter e Resend por fetch, não é preciso outra dependência, e o endereço da API pode
+ * fala com o Resend por fetch, não é preciso outra dependência, e o endereço da API pode
  * ser trocado (CLOUDINARY_UPLOAD_PREFIX, o mesmo nome usado pelo SDK) para testar com um servidor falso.
  *
  * Nunca registre em log o objeto de configuração nem o corpo das requisições (têm a chave e a assinatura).
