@@ -119,7 +119,7 @@ export function DatePicker({ id, value, onChange, onBlur, min, invalid, describe
   }
 
   // Mês mostrado = mês do dia com foco.
-  const view = focusDay ? dateInputToDate(focusDay) : new Date();
+  const view = dateInputToDate(focusDay || today);
   const viewYear = view.getFullYear();
   const viewMonth = view.getMonth();
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();

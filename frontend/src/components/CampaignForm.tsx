@@ -13,7 +13,7 @@ import {
   type CampaignField,
   type CampaignFieldValues,
 } from "@/lib/campaign-rules";
-import { dateInputToIso, isoToDateInput } from "@/lib/date-input";
+import { isoToDateInput } from "@/lib/date-input";
 import { apiToMoneyInput, moneyInputToApi } from "@/lib/money-input";
 import { goBack } from "@/lib/navigation";
 import { confirmLeave } from "@/lib/unsaved-changes";
@@ -129,7 +129,7 @@ export function CampaignForm({ initial, submitLabel, cancelHref, onSubmit }: Cam
         title: title.trim(),
         description: description.trim(),
         goalAmount: moneyInputToApi(goalAmount), // "5.000,00" -> "5000.00"
-        deadline: dateInputToIso(deadline),
+        deadline, // "AAAA-MM-DD": o backend interpreta no fuso de São Paulo
         categoryId: Number(categoryId),
         imageUrl: imageUrl || null,
       });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Campaign } from "@/types/campaign";
-import { daysUntil, formatCurrency, formatDaysLeft } from "@/lib/format";
+import { formatCurrency, formatDaysLeft } from "@/lib/format";
 import { CoverImage } from "./CoverImage";
 import { ProgressBar } from "./ProgressBar";
 import { StatusBadge } from "./StatusBadge";
@@ -9,10 +9,11 @@ type CampaignCardProps = {
   campaign: Campaign;
   asLink?: boolean; // false: mesmo visual, mas sem ser um link (pré-visualização, "Minha conta")
   goalText?: string; // texto no lugar da meta formatada (pré-visualização com a meta ainda vazia)
+  deadlineText?: string; // texto no lugar dos dias restantes (pré-visualização sem prazo)
 };
 
 // Card da listagem: o card inteiro é um link para o detalhe da campanha.
-export function CampaignCard({ campaign, asLink = true, goalText }: CampaignCardProps) {
+export function CampaignCard({ campaign, asLink = true, goalText, deadlineText }: CampaignCardProps) {
   const content = (
     <>
       <CoverImage src={campaign.imageUrl} alt={campaign.title} size="card" aiGenerated={campaign.imageGeneratedByAi} />
@@ -31,7 +32,7 @@ export function CampaignCard({ campaign, asLink = true, goalText }: CampaignCard
             <span className="font-semibold">{formatCurrency(campaign.raisedAmount)}</span>
             <span className="text-zinc-600"> de {goalText ?? formatCurrency(campaign.goalAmount)}</span>
           </p>
-          <p className="text-xs text-zinc-500">{formatDaysLeft(daysUntil(campaign.deadline), campaign.status)}</p>
+          <p className="text-xs text-zinc-500">{deadlineText ?? formatDaysLeft(campaign)}</p>
         </div>
       </div>
     </>

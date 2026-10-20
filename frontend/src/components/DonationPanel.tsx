@@ -17,7 +17,8 @@ export function DonationPanel({ campaign, onDonated }: DonationPanelProps) {
 
   if (!ready) return null;
 
-  if (campaign.status !== "ACTIVE" || campaign.daysLeft === 0) {
+  // Prazo hoje ainda aceita doações (até 23:59 em Brasília); expired vem do backend.
+  if (campaign.status !== "ACTIVE" || campaign.expired) {
     return <Reason text="Esta campanha está encerrada e não aceita mais doações." />;
   }
 

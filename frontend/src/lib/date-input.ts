@@ -1,4 +1,11 @@
-// Conversões para o <input type="date"> (formato "AAAA-MM-DD", no fuso local do navegador).
+// Datas de calendário no formato "AAAA-MM-DD". "Hoje" e o prazo são sempre contados no fuso
+// America/Sao_Paulo, qualquer que seja o fuso do navegador: a mesma regra de backend/src/lib/dates.ts.
+
+export const TIME_ZONE = "America/Sao_Paulo";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// en-CA formata como "AAAA-MM-DD".
+const calendarFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
 
 function toInputFormat(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -6,21 +13,35 @@ function toInputFormat(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-// "2026-12-31T23:59:59.000Z" -> "2026-12-31"
+// Data de calendário do instante em São Paulo.
+export function calendarDateInSaoPaulo(date: Date): string {
+  return calendarFormatter.format(date);
+}
+
+export function todayInSaoPaulo(now: Date = new Date()): string {
+  return calendarDateInSaoPaulo(now);
+}
+
+// "2026-12-20T02:59:59.999Z" (prazo gravado pela API) -> "2026-12-19" (o dia em São Paulo)
 export function isoToDateInput(iso: string): string {
-  return toInputFormat(new Date(iso));
+  return calendarDateInSaoPaulo(new Date(iso));
 }
 
-// "2026-12-31" -> ISO do fim desse dia no fuso local (a campanha vale o dia inteiro).
-export function dateInputToIso(value: string): string {
-  return new Date(`${value}T23:59:59`).toISOString();
+// "AAAA-MM-DD" -> número do dia (dias desde 1970-01-01), para subtrair datas de calendário.
+function dayNumber(value: string): number {
+  const [year, month, day] = value.split("-").map(Number);
+  return Date.UTC(year, month - 1, day) / DAY_MS;
 }
 
-// Data de hoje + N dias, no formato do input (ex.: daysFromToday(1) = amanhã).
-export function daysFromToday(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return toInputFormat(date);
+// Dias de calendário de hoje (São Paulo) até o prazo "AAAA-MM-DD": hoje = 0, amanhã = 1, ontem = -1.
+// Usado só na pré-visualização; nas demais telas o daysLeft vem do backend.
+export function diffCalendarDays(deadline: string, now: Date = new Date()): number {
+  return dayNumber(deadline) - dayNumber(todayInSaoPaulo(now));
+}
+
+// Data de hoje + N dias em São Paulo (ex.: daysFromToday(30) = atalho "30 dias").
+export function daysFromToday(days: number, now: Date = new Date()): string {
+  return addDays(todayInSaoPaulo(now), days);
 }
 
 // ---------- Calendário (DatePicker) e digitação em dd/mm/aaaa ----------
@@ -41,11 +62,9 @@ export function dateToDateInput(date: Date): string {
   return toInputFormat(date);
 }
 
-// Soma dias a uma data "AAAA-MM-DD" (aceita negativos).
+// Soma dias a uma data "AAAA-MM-DD" (aceita negativos). Conta em UTC: não sofre com horário de verão.
 export function addDays(value: string, days: number): string {
-  const date = dateInputToDate(value);
-  date.setDate(date.getDate() + days);
-  return toInputFormat(date);
+  return new Date((dayNumber(value) + days) * DAY_MS).toISOString().slice(0, 10);
 }
 
 // Soma meses mantendo o dia quando possível (31/01 + 1 mês = 28 ou 29/02).

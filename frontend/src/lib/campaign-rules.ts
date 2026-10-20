@@ -49,7 +49,7 @@ export function validateField(field: CampaignField, values: CampaignFieldValues)
     case "deadline":
       if (!values.deadline) return "Escolha o prazo da campanha.";
       // Comparar as strings "AAAA-MM-DD" funciona porque o formato é ordenável.
-      if (values.deadline < daysFromToday(1)) return "O prazo deve ser a partir de amanhã.";
+      if (values.deadline < daysFromToday(0)) return "O prazo deve ser hoje ou uma data futura.";
       return "";
     case "categoryId":
       return values.categoryId ? "" : "Escolha uma categoria.";

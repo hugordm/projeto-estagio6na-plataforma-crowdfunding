@@ -13,8 +13,8 @@ type DeadlineInputProps = {
   invalid?: boolean;
 };
 
-// Prazo da campanha: calendário (DatePicker) com mínimo de amanhã e atalhos de 30, 60 e 90 dias
-// a partir de hoje. O atalho que corresponde à data escolhida fica destacado.
+// Prazo da campanha: calendário (DatePicker) com mínimo de hoje e atalhos de 30, 60 e 90 dias
+// a partir de hoje (em America/Sao_Paulo). O atalho que corresponde à data escolhida fica destacado.
 export function DeadlineInput({ id, value, onChange, onBlur, invalid }: DeadlineInputProps) {
   return (
     <div className="space-y-2">
@@ -23,7 +23,7 @@ export function DeadlineInput({ id, value, onChange, onBlur, invalid }: Deadline
         value={value}
         onChange={onChange}
         onBlur={onBlur}
-        min={daysFromToday(1)}
+        min={daysFromToday(0)}
         invalid={invalid}
         describedBy={`${id}-help`}
       />

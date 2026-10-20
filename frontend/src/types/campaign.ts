@@ -15,7 +15,9 @@ export type Campaign = {
   donorsCount: number;
   imageUrl: string | null;
   imageGeneratedByAi: boolean; // definido pelo backend: a capa foi gerada pela IA da plataforma
-  deadline: string;
+  deadline: string; // fim do dia do prazo em America/Sao_Paulo
+  daysLeft: number; // dias de calendário até o prazo (hoje = 0), nunca negativo
+  expired: boolean; // o dia do prazo já terminou
   status: CampaignStatus;
   ownerId: number;
   categoryId: number;
@@ -25,20 +27,18 @@ export type Campaign = {
   category: Category;
 };
 
-// GET /campaigns/:id traz também os dias restantes.
-export type CampaignDetail = Campaign & {
-  daysLeft: number;
-};
+// GET /campaigns/:id: mesmo formato da listagem.
+export type CampaignDetail = Campaign;
 
-// Item de GET /me/campaigns: campanha do usuário logado, já com os dias restantes.
-export type MyCampaign = Campaign & { daysLeft: number };
+// Item de GET /me/campaigns: mesmo formato da listagem.
+export type MyCampaign = Campaign;
 
 // Corpo de POST /campaigns.
 export type CampaignInput = {
   title: string;
   description: string;
   goalAmount: string;
-  deadline: string;
+  deadline: string; // "AAAA-MM-DD": dia do prazo em America/Sao_Paulo
   categoryId: number;
   imageUrl?: string;
 };

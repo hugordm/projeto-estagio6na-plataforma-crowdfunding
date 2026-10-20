@@ -97,7 +97,7 @@ export default function CampaignPage() {
               </div>
               <div>
                 <dt className="text-zinc-500">Prazo</dt>
-                <dd className="font-semibold">{formatDaysLeft(campaign.daysLeft, campaign.status)}</dd>
+                <dd className="font-semibold">{formatDaysLeft(campaign)}</dd>
               </div>
             </dl>
           </section>

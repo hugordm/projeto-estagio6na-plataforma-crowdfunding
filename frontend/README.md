@@ -133,11 +133,11 @@ Os botões de IA mostram, só quando desabilitados, uma frase curta com o que fa
 |---------|-----------|
 | `api.ts` | Único ponto de acesso à API: `request()` monta a URL, envia JSON ou `FormData`, anexa o token, converte `{ error }` em `ApiError` e, em 401 por token recusado, encerra a sessão ("Sua sessão expirou. Entre novamente."). Exporta uma função por endpoint. |
 | `session.ts` | Lê, grava e apaga a sessão (usuário + token) no `localStorage`; o comentário do arquivo explica o trade-off de segurança. |
-| `campaign-rules.ts` | Mesmos limites do backend (título 3 a 120, descrição 10 a 5000, meta de R$ 0,01 a R$ 9.999.999.999,99, prazo a partir de amanhã, categoria obrigatória) e a dica do que falta para usar a IA. |
+| `campaign-rules.ts` | Mesmos limites do backend (título 3 a 120, descrição 10 a 5000, meta de R$ 0,01 a R$ 9.999.999.999,99, prazo a partir de hoje em Brasília, categoria obrigatória) e a dica do que falta para usar a IA. |
 | `password-rules.ts` | Regra de senha (8 a 72 caracteres) com a mesma mensagem do backend. |
 | `money-input.ts` | Máscara de dinheiro (dígitos viram centavos) e conversão para o formato da API (`"5000.00"`) e de volta. |
-| `date-input.ts` | Datas no formato `AAAA-MM-DD`, conversão para o ISO enviado à API (fim do dia no fuso local), formato dd/mm/aaaa, máscara de digitação e utilitários do calendário. |
-| `format.ts` | Moeda (R$), datas e dias restantes no padrão brasileiro. |
+| `date-input.ts` | Datas no formato `AAAA-MM-DD` (enviadas assim à API), "hoje" e atalhos de prazo sempre no fuso America/Sao_Paulo (`todayInSaoPaulo`, `daysFromToday`, `diffCalendarDays`, mesma regra de `backend/src/lib/dates.ts`), formato dd/mm/aaaa, máscara de digitação e utilitários do calendário. |
+| `format.ts` | Moeda (R$), datas (prazo no fuso de Brasília) e o texto do prazo a partir de `daysLeft`/`expired` do backend ("N dias restantes", "1 dia restante", "Último dia", "Prazo encerrado"). |
 | `email-param.ts` | E-mail passado pela URL (`?email=`): só aceita formato de e-mail. |
 | `navigation.ts` | Marca na `sessionStorage` se houve navegação interna (usada pelo `BackButton`). |
 | `unsaved-changes.ts` | Registro de "há alterações não salvas", consultado por "Voltar" e "Cancelar". |
